@@ -165,9 +165,9 @@ export default function App() {
     }
   };
 
-  const handleDrop = (square: Square) => {
-    if (!selected || !canAct) return;
-    if (selected !== square) attemptMove(selected, square);
+  const handleDrop = (from: Square, to: Square) => {
+    if (!canAct) return;
+    if (from !== to) attemptMove(from, to);
     setSelected(null);
   };
 

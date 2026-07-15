@@ -1,4 +1,4 @@
-import { UNICODE_PIECES } from './Board';
+import { UNICODE_PIECES } from './pieceGlyphs';
 
 export type PromotionPiece = 'q' | 'r' | 'b' | 'n';
 

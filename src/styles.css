@@ -101,10 +101,23 @@ body {
 
 .piece.draggable {
   cursor: grab;
+  touch-action: none;
 }
 
 .piece.draggable:active {
   cursor: grabbing;
+}
+
+.piece.dragging-source {
+  opacity: 0.35;
+}
+
+.piece.drag-ghost {
+  position: fixed;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 50;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
 }
 
 .piece.w {

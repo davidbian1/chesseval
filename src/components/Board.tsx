@@ -1,11 +1,9 @@
+import { useState } from 'react';
 import type { Square } from 'chess.js';
+import { UNICODE_PIECES } from './pieceGlyphs';
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-
-export const UNICODE_PIECES: Record<string, string> = {
-  wp: '♙', wn: '♘', wb: '♗', wr: '♖', wq: '♕', wk: '♔',
-  bp: '♟', bn: '♞', bb: '♝', br: '♜', bq: '♛', bk: '♚',
-};
+const DRAG_THRESHOLD_PX = 4;
 
 export interface BoardSquare {
   square: Square;
@@ -21,11 +19,19 @@ interface BoardProps {
   inCheckSquare: Square | null;
   onSquareClick: (square: Square) => void;
   onPieceDragStart: (square: Square) => void;
-  onDrop: (square: Square) => void;
+  onDrop: (from: Square, to: Square) => void;
   onDragEnd: () => void;
   /** Whether the side to move may currently drag their own pieces. */
   canDrag: boolean;
   turnColor: 'w' | 'b';
+}
+
+interface DragGhost {
+  square: Square;
+  glyph: string;
+  color: 'w' | 'b';
+  x: number;
+  y: number;
 }
 
 function toSquare(rank: number, file: number): Square {
@@ -33,6 +39,17 @@ function toSquare(rank: number, file: number): Square {
   return `${FILES[file]}${8 - rank}` as Square;
 }
 
+/**
+ * Drag-and-drop uses pointer events rather than the native HTML5 Drag and
+ * Drop API — the native API relies on the OS's drag session, which is
+ * unreliable inside embedded webviews (e.g. Tauri's WebView2).
+ *
+ * The move/up listeners are attached to `document` for the duration of the
+ * gesture (rather than relying on the dragged element via setPointerCapture)
+ * so the drag keeps tracking correctly even if the pointer moves faster than
+ * the browser can keep the original element under it, and even in
+ * environments where pointer capture itself is flaky.
+ */
 export function Board({
   board,
   orientation,
@@ -47,8 +64,57 @@ export function Board({
   canDrag,
   turnColor,
 }: BoardProps) {
+  const [ghost, setGhost] = useState<DragGhost | null>(null);
+
   const rankIndices = orientation === 'w' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
   const fileIndices = orientation === 'w' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
+
+  function handlePointerDown(
+    e: React.PointerEvent<HTMLSpanElement>,
+    square: Square,
+    piece: { type: string; color: 'w' | 'b' },
+  ) {
+    if (!canDrag || piece.color !== turnColor) return;
+
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const glyph = UNICODE_PIECES[`${piece.color}${piece.type}`];
+    let dragging = false;
+
+    const onMove = (ev: PointerEvent) => {
+      if (!dragging) {
+        const dx = ev.clientX - startX;
+        const dy = ev.clientY - startY;
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+        dragging = true;
+        setGhost({ square, glyph, color: piece.color, x: ev.clientX, y: ev.clientY });
+        onPieceDragStart(square);
+      }
+      setGhost((g) => (g ? { ...g, x: ev.clientX, y: ev.clientY } : g));
+    };
+
+    const onUp = (ev: PointerEvent) => {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+      setGhost(null);
+
+      if (!dragging) return; // Plain click/tap — let the native click handler deal with it.
+
+      const target = document.elementFromPoint(ev.clientX, ev.clientY);
+      const squareEl = target instanceof Element ? target.closest<HTMLElement>('[data-square]') : null;
+      const toSquare = squareEl?.dataset.square as Square | undefined;
+      if (toSquare) {
+        onDrop(square, toSquare);
+      } else {
+        onDragEnd();
+      }
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', onUp);
+  }
 
   return (
     <div className="board">
@@ -62,6 +128,7 @@ export function Board({
           const isLastMove = lastMove && (lastMove.from === square || lastMove.to === square);
           const isCheck = inCheckSquare === square;
           const isDraggable = canDrag && !!piece && piece.color === turnColor;
+          const isGhostSource = ghost?.square === square;
 
           const classes = [
             'square',
@@ -74,16 +141,7 @@ export function Board({
             .join(' ');
 
           return (
-            <div
-              key={square}
-              className={classes}
-              onClick={() => onSquareClick(square)}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault();
-                onDrop(square);
-              }}
-            >
+            <div key={square} data-square={square} className={classes} onClick={() => onSquareClick(square)}>
               {file === (orientation === 'w' ? 0 : 7) && (
                 <span className="coord rank-label">{rank <= 7 && 8 - rank}</span>
               )}
@@ -92,18 +150,8 @@ export function Board({
               )}
               {piece && (
                 <span
-                  className={`piece ${piece.color}${isDraggable ? ' draggable' : ''}`}
-                  draggable={isDraggable}
-                  onDragStart={(e) => {
-                    if (!isDraggable) {
-                      e.preventDefault();
-                      return;
-                    }
-                    e.dataTransfer.setData('text/plain', square);
-                    e.dataTransfer.effectAllowed = 'move';
-                    onPieceDragStart(square);
-                  }}
-                  onDragEnd={onDragEnd}
+                  className={`piece ${piece.color}${isDraggable ? ' draggable' : ''}${isGhostSource ? ' dragging-source' : ''}`}
+                  onPointerDown={(e) => handlePointerDown(e, square, piece)}
                 >
                   {UNICODE_PIECES[`${piece.color}${piece.type}`]}
                 </span>
@@ -112,6 +160,11 @@ export function Board({
             </div>
           );
         }),
+      )}
+      {ghost && (
+        <span className={`piece ${ghost.color} drag-ghost`} style={{ left: ghost.x, top: ghost.y }}>
+          {ghost.glyph}
+        </span>
       )}
     </div>
   );
