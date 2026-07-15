@@ -3,7 +3,8 @@ import { Chess, type Square } from 'chess.js';
 import { Board } from './components/Board';
 import { EvalBar } from './components/EvalBar';
 import { Controls, type GameMode, type Side } from './components/Controls';
-import { findBestMove } from './engine/stockfish';
+import { PromotionPicker, type PromotionPiece } from './components/PromotionPicker';
+import { findBestMove, stopSearch } from './engine/stockfish';
 import './styles.css';
 
 const AI_BASE_TIME_MS = 1200;
@@ -36,6 +37,9 @@ export default function App() {
   const [mateIn, setMateIn] = useState<number | null>(null);
   const [aiThinking, setAiThinking] = useState(false);
   const [evalThinking, setEvalThinking] = useState(false);
+  const [pendingPromotion, setPendingPromotion] = useState<{ from: Square; to: Square; color: Side } | null>(
+    null,
+  );
   const skipNextEvalRef = useRef(false);
 
   const chess = chessRef.current;
@@ -112,27 +116,35 @@ export default function App() {
     : [];
 
   const isHumanTurn = mode === 'human' || chess.turn() === humanSide;
+  const canAct = !gameOver && !aiThinking && isHumanTurn && !pendingPromotion;
+
+  /** Applies a move if it's unambiguous, or opens the promotion picker if it isn't. */
+  const attemptMove = (from: Square, to: Square): 'moved' | 'promotion-pending' | 'invalid' => {
+    const matches = chess.moves({ square: from, verbose: true }).filter((m) => m.to === to);
+    if (matches.length === 0) return 'invalid';
+    if (matches.length === 1) {
+      chess.move(matches[0]);
+      refresh();
+      return 'moved';
+    }
+    // Multiple matches sharing the same from/to only happens for promotions (one per piece choice).
+    setPendingPromotion({ from, to, color: chess.turn() });
+    return 'promotion-pending';
+  };
 
   const handleSquareClick = (square: Square) => {
-    if (gameOver || aiThinking || !isHumanTurn) return;
+    if (!canAct) return;
 
     if (selected) {
       if (selected === square) {
         setSelected(null);
         return;
       }
-      const moves = chess.moves({ square: selected, verbose: true });
-      const target = moves.find((m) => m.to === square);
-      if (target) {
-        chess.move({ from: selected, to: square, promotion: target.promotion ?? 'q' });
-        setSelected(null);
-        refresh();
-        return;
-      }
-      // Clicked another square: reselect if it has a movable piece.
-      const piece = chess.get(square);
-      if (piece && piece.color === chess.turn()) {
-        setSelected(square);
+      const outcome = attemptMove(selected, square);
+      if (outcome === 'invalid') {
+        // Clicked another square: reselect if it has a movable piece.
+        const piece = chess.get(square);
+        setSelected(piece && piece.color === chess.turn() ? square : null);
       } else {
         setSelected(null);
       }
@@ -145,9 +157,34 @@ export default function App() {
     }
   };
 
+  const handlePieceDragStart = (square: Square) => {
+    if (!canAct) return;
+    const piece = chess.get(square);
+    if (piece && piece.color === chess.turn()) {
+      setSelected(square);
+    }
+  };
+
+  const handleDrop = (square: Square) => {
+    if (!selected || !canAct) return;
+    if (selected !== square) attemptMove(selected, square);
+    setSelected(null);
+  };
+
+  const completePromotion = (piece: PromotionPiece) => {
+    if (!pendingPromotion) return;
+    chess.move({ from: pendingPromotion.from, to: pendingPromotion.to, promotion: piece });
+    setPendingPromotion(null);
+    refresh();
+  };
+
+  const cancelPromotion = () => setPendingPromotion(null);
+
   const handleNewGame = () => {
+    stopSearch();
     chessRef.current = new Chess();
     setSelected(null);
+    setPendingPromotion(null);
     setAiThinking(false);
     setEvalScore(0);
     setMateIn(null);
@@ -185,15 +222,27 @@ export default function App() {
           lastMove={lastMove ? { from: lastMove.from as Square, to: lastMove.to as Square } : null}
           inCheckSquare={inCheckSquare}
           onSquareClick={handleSquareClick}
+          onPieceDragStart={handlePieceDragStart}
+          onDrop={handleDrop}
+          onDragEnd={() => setSelected(null)}
+          canDrag={canAct}
+          turnColor={chess.turn()}
         />
+        {pendingPromotion && (
+          <PromotionPicker color={pendingPromotion.color} onPick={completePromotion} onCancel={cancelPromotion} />
+        )}
         <Controls
           mode={mode}
           onModeChange={(m) => {
+            stopSearch();
             setMode(m);
             setSelected(null);
           }}
           humanSide={humanSide}
-          onHumanSideChange={setHumanSide}
+          onHumanSideChange={(side) => {
+            stopSearch();
+            setHumanSide(side);
+          }}
           strength={strength}
           onStrengthChange={setStrength}
           onNewGame={handleNewGame}

@@ -108,6 +108,11 @@ class StockfishEngine {
         }),
     );
   }
+
+  /** Interrupts any in-flight search so it reports a bestmove immediately instead of running out its full budget. */
+  stop(): void {
+    this.worker.postMessage('stop');
+  }
 }
 
 function matchUciMove(legalMoves: Move[], uciMove: string | undefined): Move | null {
@@ -134,4 +139,9 @@ export function findBestMove(chess: Chess, timeBudgetMs: number, strength = 1): 
   const skillLevel = Math.round(strength * 20);
   const movetimeMs = Math.max(50, timeBudgetMs * Math.max(0.15, strength));
   return getEngine().go(chess, { movetimeMs, skillLevel });
+}
+
+/** Interrupts whatever search is currently running (e.g. when the game is reset mid-think). */
+export function stopSearch(): void {
+  engine?.stop();
 }

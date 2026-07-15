@@ -99,6 +99,14 @@ body {
   filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.35));
 }
 
+.piece.draggable {
+  cursor: grab;
+}
+
+.piece.draggable:active {
+  cursor: grabbing;
+}
+
 .piece.w {
   color: #fbf6ec;
   -webkit-text-stroke: 1px #4a3a26;
@@ -266,6 +274,59 @@ body {
 
 .new-game:active {
   transform: scale(0.96);
+}
+
+.promotion-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(58, 47, 34, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.promotion-popup {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+}
+
+.promotion-title {
+  font-size: 13px;
+  color: var(--wood-darker);
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.promotion-choices {
+  display: flex;
+  gap: 8px;
+}
+
+.promotion-choice {
+  width: 56px;
+  height: 56px;
+  font-size: 36px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--wood-light);
+  cursor: pointer;
+  transition: transform 0.1s, background 0.15s;
+}
+
+.promotion-choice:hover {
+  background: var(--accent-soft);
+}
+
+.promotion-choice:active {
+  transform: scale(0.94);
 }
 
 .status {

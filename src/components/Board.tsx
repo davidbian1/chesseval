@@ -2,7 +2,7 @@ import type { Square } from 'chess.js';
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 
-const UNICODE_PIECES: Record<string, string> = {
+export const UNICODE_PIECES: Record<string, string> = {
   wp: '♙', wn: '♘', wb: '♗', wr: '♖', wq: '♕', wk: '♔',
   bp: '♟', bn: '♞', bb: '♝', br: '♜', bq: '♛', bk: '♚',
 };
@@ -20,6 +20,12 @@ interface BoardProps {
   lastMove: { from: Square; to: Square } | null;
   inCheckSquare: Square | null;
   onSquareClick: (square: Square) => void;
+  onPieceDragStart: (square: Square) => void;
+  onDrop: (square: Square) => void;
+  onDragEnd: () => void;
+  /** Whether the side to move may currently drag their own pieces. */
+  canDrag: boolean;
+  turnColor: 'w' | 'b';
 }
 
 function toSquare(rank: number, file: number): Square {
@@ -35,6 +41,11 @@ export function Board({
   lastMove,
   inCheckSquare,
   onSquareClick,
+  onPieceDragStart,
+  onDrop,
+  onDragEnd,
+  canDrag,
+  turnColor,
 }: BoardProps) {
   const rankIndices = orientation === 'w' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
   const fileIndices = orientation === 'w' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
@@ -50,6 +61,7 @@ export function Board({
           const isTarget = legalTargets.includes(square);
           const isLastMove = lastMove && (lastMove.from === square || lastMove.to === square);
           const isCheck = inCheckSquare === square;
+          const isDraggable = canDrag && !!piece && piece.color === turnColor;
 
           const classes = [
             'square',
@@ -62,7 +74,16 @@ export function Board({
             .join(' ');
 
           return (
-            <div key={square} className={classes} onClick={() => onSquareClick(square)}>
+            <div
+              key={square}
+              className={classes}
+              onClick={() => onSquareClick(square)}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault();
+                onDrop(square);
+              }}
+            >
               {file === (orientation === 'w' ? 0 : 7) && (
                 <span className="coord rank-label">{rank <= 7 && 8 - rank}</span>
               )}
@@ -70,7 +91,20 @@ export function Board({
                 <span className="coord file-label">{FILES[file]}</span>
               )}
               {piece && (
-                <span className={`piece ${piece.color}`}>
+                <span
+                  className={`piece ${piece.color}${isDraggable ? ' draggable' : ''}`}
+                  draggable={isDraggable}
+                  onDragStart={(e) => {
+                    if (!isDraggable) {
+                      e.preventDefault();
+                      return;
+                    }
+                    e.dataTransfer.setData('text/plain', square);
+                    e.dataTransfer.effectAllowed = 'move';
+                    onPieceDragStart(square);
+                  }}
+                  onDragEnd={onDragEnd}
+                >
                   {UNICODE_PIECES[`${piece.color}${piece.type}`]}
                 </span>
               )}

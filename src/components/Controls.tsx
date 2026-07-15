@@ -84,7 +84,7 @@ export function Controls({
       )}
 
       <div className="control-row">
-        <button className="new-game" onClick={onNewGame}>New Game</button>
+        <button className="new-game" onClick={onNewGame}>Restart Game</button>
       </div>
 
       <div className="status">{status}</div>
