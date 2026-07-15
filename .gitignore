@@ -1,0 +1,18 @@
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+.claude/settings.local.json
+
+# Rust / Tauri
+src-tauri/target
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
