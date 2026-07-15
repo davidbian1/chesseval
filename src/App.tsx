@@ -3,7 +3,7 @@ import { Chess, type Square } from 'chess.js';
 import { Board } from './components/Board';
 import { EvalBar } from './components/EvalBar';
 import { Controls, type GameMode, type Side } from './components/Controls';
-import { findBestMove } from './engine/search';
+import { findBestMove } from './engine/stockfish';
 import './styles.css';
 
 const AI_BASE_TIME_MS = 1200;
@@ -50,10 +50,12 @@ export default function App() {
     if (mode !== 'ai' || gameOver) return;
     if (chess.turn() === humanSide) return;
 
+    let cancelled = false;
     setAiThinking(true);
     const timeBudget = AI_BASE_TIME_MS * (0.3 + strength * 1.7);
-    const timer = setTimeout(() => {
-      const result = findBestMove(chessRef.current, timeBudget, strength);
+    const timer = setTimeout(async () => {
+      const result = await findBestMove(chessRef.current, timeBudget, strength);
+      if (cancelled) return;
       if (result.move) {
         chessRef.current.move(result.move);
         skipNextEvalRef.current = true;
@@ -64,29 +66,44 @@ export default function App() {
       refresh();
     }, 30);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fen, mode, humanSide]);
 
   // Eval-bar refresh for any position not already scored by the AI-move effect.
+  // Always evaluated at full engine strength, regardless of the AI opponent's
+  // difficulty setting — the bar should show the honest assessment.
   useEffect(() => {
     if (skipNextEvalRef.current) {
       skipNextEvalRef.current = false;
       return;
     }
     if (gameOver) {
-      setEvalScore(chess.isCheckmate() ? (chess.turn() === 'w' ? -100000 : 100000) : 0);
-      setMateIn(null);
+      if (chess.isCheckmate()) {
+        setEvalScore(chess.turn() === 'w' ? -100000 : 100000);
+        setMateIn(chess.turn() === 'b' ? 1 : -1);
+      } else {
+        setEvalScore(0);
+        setMateIn(null);
+      }
       return;
     }
+    let cancelled = false;
     setEvalThinking(true);
-    const timer = setTimeout(() => {
-      const result = findBestMove(chessRef.current, 300, 0.45);
+    const timer = setTimeout(async () => {
+      const result = await findBestMove(chessRef.current, 600, 1);
+      if (cancelled) return;
       setEvalScore(result.score);
       setMateIn(result.mateIn);
       setEvalThinking(false);
     }, 10);
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fen]);
 
