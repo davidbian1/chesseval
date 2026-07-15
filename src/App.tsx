@@ -4,12 +4,24 @@ import { Board } from './components/Board';
 import { EvalBar } from './components/EvalBar';
 import { Controls, type GameMode, type Side } from './components/Controls';
 import { PromotionPicker, type PromotionPiece } from './components/PromotionPicker';
+import { ConfirmDialog } from './components/ConfirmDialog';
 import { findBestMove, stopSearch } from './engine/stockfish';
 import './styles.css';
 
 const AI_BASE_TIME_MS = 1200;
 
-function statusText(chess: Chess, mode: GameMode, humanSide: Side, thinking: boolean): string {
+function statusText(
+  chess: Chess,
+  mode: GameMode,
+  humanSide: Side,
+  thinking: boolean,
+  resignedBy: Side | null,
+): string {
+  if (resignedBy) {
+    const winner = resignedBy === 'w' ? 'Black' : 'White';
+    const loser = resignedBy === 'w' ? 'White' : 'Black';
+    return `${loser} resigns — ${winner} wins`;
+  }
   if (chess.isCheckmate()) {
     const winner = chess.turn() === 'w' ? 'Black' : 'White';
     return `Checkmate — ${winner} wins`;
@@ -40,10 +52,12 @@ export default function App() {
   const [pendingPromotion, setPendingPromotion] = useState<{ from: Square; to: Square; color: Side } | null>(
     null,
   );
+  const [resignedBy, setResignedBy] = useState<Side | null>(null);
+  const [confirmingResign, setConfirmingResign] = useState(false);
   const skipNextEvalRef = useRef(false);
 
   const chess = chessRef.current;
-  const gameOver = chess.isGameOver();
+  const gameOver = chess.isGameOver() || resignedBy !== null;
 
   const refresh = useCallback(() => {
     setFen(chessRef.current.fen());
@@ -75,7 +89,7 @@ export default function App() {
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fen, mode, humanSide]);
+  }, [fen, mode, humanSide, resignedBy]);
 
   // Eval-bar refresh for any position not already scored by the AI-move effect.
   // Always evaluated at full engine strength, regardless of the AI opponent's
@@ -85,6 +99,7 @@ export default function App() {
       skipNextEvalRef.current = false;
       return;
     }
+    if (resignedBy) return; // eval already set directly by handleResign.
     if (gameOver) {
       if (chess.isCheckmate()) {
         setEvalScore(chess.turn() === 'w' ? -100000 : 100000);
@@ -109,14 +124,14 @@ export default function App() {
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fen]);
+  }, [fen, resignedBy]);
 
   const legalTargets = selected
     ? chess.moves({ square: selected, verbose: true }).map((m) => m.to as Square)
     : [];
 
   const isHumanTurn = mode === 'human' || chess.turn() === humanSide;
-  const canAct = !gameOver && !aiThinking && isHumanTurn && !pendingPromotion;
+  const canAct = !gameOver && !aiThinking && isHumanTurn && !pendingPromotion && !confirmingResign;
 
   /** Applies a move if it's unambiguous, or opens the promotion picker if it isn't. */
   const attemptMove = (from: Square, to: Square): 'moved' | 'promotion-pending' | 'invalid' => {
@@ -185,11 +200,34 @@ export default function App() {
     chessRef.current = new Chess();
     setSelected(null);
     setPendingPromotion(null);
+    setResignedBy(null);
+    setConfirmingResign(false);
     setAiThinking(false);
     setEvalScore(0);
     setMateIn(null);
     skipNextEvalRef.current = false;
     refresh();
+  };
+
+  const requestResign = () => {
+    if (gameOver) return;
+    setConfirmingResign(true);
+  };
+
+  const cancelResign = () => setConfirmingResign(false);
+
+  const confirmResign = () => {
+    setConfirmingResign(false);
+    // In Human vs AI, resigning always means the human gives up. In Human vs
+    // Human there's no fixed "human side", so it's whoever's turn it is.
+    const resigningSide: Side = mode === 'ai' ? humanSide : chess.turn();
+    stopSearch();
+    setSelected(null);
+    setPendingPromotion(null);
+    setAiThinking(false);
+    setEvalScore(resigningSide === 'w' ? -100000 : 100000);
+    setMateIn(null);
+    setResignedBy(resigningSide);
   };
 
   const history = chess.history({ verbose: true });
@@ -213,7 +251,12 @@ export default function App() {
     <div className="app">
       <h1 className="title">chesseval</h1>
       <div className="game-area">
-        <EvalBar score={evalScore} mateIn={mateIn} thinking={aiThinking || evalThinking} />
+        <EvalBar
+          score={evalScore}
+          mateIn={mateIn}
+          thinking={aiThinking || evalThinking}
+          resultLabel={resignedBy ? (resignedBy === 'w' ? '0–1' : '1–0') : null}
+        />
         <Board
           board={chess.board()}
           orientation={orientation}
@@ -231,6 +274,14 @@ export default function App() {
         {pendingPromotion && (
           <PromotionPicker color={pendingPromotion.color} onPick={completePromotion} onCancel={cancelPromotion} />
         )}
+        {confirmingResign && (
+          <ConfirmDialog
+            message="Resign this game?"
+            confirmLabel="Resign"
+            onConfirm={confirmResign}
+            onCancel={cancelResign}
+          />
+        )}
         <Controls
           mode={mode}
           onModeChange={(m) => {
@@ -246,7 +297,9 @@ export default function App() {
           strength={strength}
           onStrengthChange={setStrength}
           onNewGame={handleNewGame}
-          status={statusText(chess, mode, humanSide, aiThinking)}
+          onResign={requestResign}
+          canResign={!gameOver}
+          status={statusText(chess, mode, humanSide, aiThinking, resignedBy)}
         />
       </div>
     </div>

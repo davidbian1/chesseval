@@ -9,6 +9,8 @@ interface ControlsProps {
   strength: number; // 0..1
   onStrengthChange: (strength: number) => void;
   onNewGame: () => void;
+  onResign: () => void;
+  canResign: boolean;
   status: string;
 }
 
@@ -27,6 +29,8 @@ export function Controls({
   strength,
   onStrengthChange,
   onNewGame,
+  onResign,
+  canResign,
   status,
 }: ControlsProps) {
   return (
@@ -83,8 +87,11 @@ export function Controls({
         </>
       )}
 
-      <div className="control-row">
+      <div className="control-row button-row">
         <button className="new-game" onClick={onNewGame}>Restart Game</button>
+        <button className="resign" onClick={onResign} disabled={!canResign}>
+          Resign
+        </button>
       </div>
 
       <div className="status">{status}</div>

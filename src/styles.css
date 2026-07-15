@@ -269,6 +269,11 @@ body {
   accent-color: var(--wood-darker);
 }
 
+.button-row {
+  flex-direction: row;
+  gap: 8px;
+}
+
 .new-game {
   font-family: inherit;
   font-size: 13px;
@@ -278,6 +283,7 @@ body {
   color: #fffaf1;
   border-radius: 6px;
   cursor: pointer;
+  flex: 1;
   transition: transform 0.1s, filter 0.15s;
 }
 
@@ -287,6 +293,33 @@ body {
 
 .new-game:active {
   transform: scale(0.96);
+}
+
+.resign {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 9px 10px;
+  border: 1px solid #96422f;
+  background: var(--panel-bg);
+  color: #96422f;
+  border-radius: 6px;
+  cursor: pointer;
+  flex: 1;
+  transition: transform 0.1s, background 0.15s, color 0.15s;
+}
+
+.resign:hover:not(:disabled) {
+  background: #96422f;
+  color: #fffaf1;
+}
+
+.resign:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.resign:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 .promotion-backdrop {
@@ -340,6 +373,60 @@ body {
 
 .promotion-choice:active {
   transform: scale(0.94);
+}
+
+.confirm-popup {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+  max-width: 260px;
+}
+
+.confirm-message {
+  font-size: 14px;
+  color: var(--ink);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirm-cancel,
+.confirm-ok {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  flex: 1;
+  transition: transform 0.1s, filter 0.15s;
+}
+
+.confirm-cancel {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.confirm-ok {
+  border: 1px solid #96422f;
+  background: #96422f;
+  color: #fffaf1;
+}
+
+.confirm-cancel:hover,
+.confirm-ok:hover {
+  filter: brightness(1.05);
+}
+
+.confirm-cancel:active,
+.confirm-ok:active {
+  transform: scale(0.96);
 }
 
 .status {
