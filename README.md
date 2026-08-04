@@ -15,6 +15,9 @@ A minimalist chess game with a live evaluation bar, playable in the browser or a
 - Adjustable AI strength slider — maps to Stockfish's Skill Level (0–20) and scales think time
 - Classic wood-tone minimal board styling
 - Desktop packaging via [Tauri](https://tauri.app)
+- Optional game history: save finished games and browse them later, backed by a small Express + Postgres API
+  (see [Full-stack: game history](#full-stack-game-history) below — off by default, the live demo above runs
+  without it)
 
 ## Running the web app
 
@@ -42,6 +45,42 @@ npm run tauri build
 
 The installer/executable is written to `src-tauri/target/release/bundle/`.
 
+## Full-stack: game history
+
+Saved games (PGN, result, mode) are stored via `server/`, a standalone Express + Prisma + Postgres API — the
+one part of this project that isn't purely client-side. It's entirely optional: the frontend only shows the
+"Save Game" / "Game History" UI when `VITE_API_URL` is set at build time, so the GitHub Pages demo (no
+backend behind it) is unaffected either way.
+
+Run the whole stack locally with Docker:
+
+```sh
+docker compose up --build
+```
+
+This starts Postgres and the API (applying Prisma migrations automatically on boot) at `http://localhost:4000`.
+Then point the frontend at it:
+
+```sh
+echo "VITE_API_URL=http://localhost:4000" > .env.local
+npm run dev
+```
+
+To work on the backend directly (without Docker): copy `server/.env.example` to `server/.env` (point
+`DATABASE_URL` at any local Postgres), then from `server/`:
+
+```sh
+npm install
+npx prisma migrate dev
+npm run dev          # API on http://localhost:4000
+npm test              # runs against DATABASE_URL from server/.env.test (see .env.test.example)
+npm run lint
+```
+
+`server/` has its own `package.json`, `eslint.config.js`, and CI job (`backend` in `.github/workflows/ci.yml`,
+which runs against a Postgres service container) — it's a separate package from the Vite frontend, not a
+workspace.
+
 ## Development
 
 ```sh
@@ -67,8 +106,14 @@ and publishes it to GitHub Pages.
 - `src/components/evalBarDisplay.ts` — pure score-to-percent/label math for the eval bar, unit tested
 - `src/components/Controls.tsx` — mode toggle, side selector, strength slider
 - `src/components/ErrorBoundary.tsx` — catches render-time errors so the app fails visibly instead of going blank
+- `src/components/GameHistory.tsx` — saved-games list/delete panel (see [Full-stack](#full-stack-game-history))
+- `src/gameResult.ts` — pure PGN-result derivation, unit tested
+- `src/api/gamesClient.ts` — fetch client for the games API, no-ops when `VITE_API_URL` is unset
 - `src/App.tsx` — game state and UI wiring
 - `src-tauri/` — Tauri desktop shell (Rust)
+- `server/` — standalone Express + Prisma + Postgres API for saved games (own `package.json`; see
+  [Full-stack](#full-stack-game-history))
+- `docker-compose.yml` — `api` + `db` services for running the full stack locally
 
 ## License
 
