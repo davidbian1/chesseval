@@ -18,7 +18,9 @@ gamesRouter.get('/', async (req, res) => {
   const offset = Math.max(Number(req.query.offset) || 0, 0);
 
   const games = await prisma.game.findMany({
-    orderBy: { createdAt: 'desc' },
+    // id as a tiebreaker: createdAt only has millisecond precision, so two
+    // games saved in the same millisecond would otherwise sort unstably.
+    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     take: limit,
     skip: offset,
   });
