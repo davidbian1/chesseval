@@ -21,6 +21,11 @@ class StockfishEngine {
 
   constructor() {
     this.worker = new Worker(ENGINE_URL);
+    // Without this, a failed/blocked worker load (e.g. wrong deploy base path)
+    // fails silently: readyPromise never resolves and every search just hangs.
+    this.worker.addEventListener('error', (e) => {
+      console.error('Stockfish worker failed to load or crashed:', e.message);
+    });
     this.readyPromise = this.handshake();
   }
 

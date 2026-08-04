@@ -443,6 +443,17 @@ body {
   transform: scale(0.96);
 }
 
+.error-boundary {
+  max-width: 320px;
+  text-align: center;
+}
+
+.error-boundary p {
+  color: var(--ink);
+  opacity: 0.85;
+  margin-bottom: 16px;
+}
+
 .status {
   font-size: 13px;
   color: var(--ink);
