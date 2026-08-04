@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: chesseval
+      POSTGRES_PASSWORD: chesseval
+      POSTGRES_DB: chesseval
+    ports:
+      - '5432:5432'
+    volumes:
+      - chesseval-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U chesseval']
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: ./server
+    environment:
+      DATABASE_URL: postgresql://chesseval:chesseval@db:5432/chesseval
+      PORT: 4000
+    ports:
+      - '4000:4000'
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  chesseval-db-data:
