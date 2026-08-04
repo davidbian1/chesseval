@@ -10,7 +10,9 @@ export interface SearchResult {
   mateIn: number | null;
 }
 
-const ENGINE_URL = '/stockfish-18-lite-single.js';
+// Respects Vite's configured base path so the worker still resolves correctly
+// when the app is served from a subpath (e.g. GitHub Pages project sites).
+const ENGINE_URL = `${import.meta.env.BASE_URL}stockfish-18-lite-single.js`;
 
 class StockfishEngine {
   private worker: Worker;
