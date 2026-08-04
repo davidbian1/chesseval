@@ -68,6 +68,8 @@ and publishes it to GitHub Pages.
 - `src/App.tsx` — game state and wiring
 - `src-tauri/` — Tauri desktop shell (Rust)
 
-## License note
+## License
+
+This project's own code is [MIT licensed](LICENSE).
 
 The bundled Stockfish engine is GPLv3-licensed. This project uses it as a separate, unmodified WASM binary invoked over the UCI protocol (the same arrangement used by lichess.org and most web chess sites), not statically linked into the app's own code. If you plan to distribute this project further, keep `Copying.txt`/attribution for Stockfish alongside it.
