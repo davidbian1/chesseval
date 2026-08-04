@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Chess, type Square } from 'chess.js';
 import { Board } from './components/Board';
 import { EvalBar } from './components/EvalBar';
 import { Controls, type GameMode, type Side } from './components/Controls';
 import { PromotionPicker, type PromotionPiece } from './components/PromotionPicker';
 import { ConfirmDialog } from './components/ConfirmDialog';
-import { findBestMove, stopSearch } from './engine/stockfish';
+import { stopSearch } from './engine/stockfish';
+import { useEngineEvaluation } from './hooks/useEngineEvaluation';
 import './styles.css';
-
-const AI_BASE_TIME_MS = 1200;
 
 function statusText(chess: Chess, mode: GameMode, humanSide: Side, thinking: boolean, resignedBy: Side | null): string {
   if (resignedBy) {
@@ -39,14 +38,9 @@ export default function App() {
   const [mode, setMode] = useState<GameMode>('ai');
   const [humanSide, setHumanSide] = useState<Side>('w');
   const [strength, setStrength] = useState(0.5);
-  const [evalScore, setEvalScore] = useState(0);
-  const [mateIn, setMateIn] = useState<number | null>(null);
-  const [aiThinking, setAiThinking] = useState(false);
-  const [evalThinking, setEvalThinking] = useState(false);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: Square; to: Square; color: Side } | null>(null);
   const [resignedBy, setResignedBy] = useState<Side | null>(null);
   const [confirmingResign, setConfirmingResign] = useState(false);
-  const skipNextEvalRef = useRef(false);
 
   const chess = chessRef.current;
   const gameOver = chess.isGameOver() || resignedBy !== null;
@@ -55,68 +49,15 @@ export default function App() {
     setFen(chessRef.current.fen());
   }, []);
 
-  // AI move effect.
-  useEffect(() => {
-    if (mode !== 'ai' || gameOver) return;
-    if (chess.turn() === humanSide) return;
-
-    let cancelled = false;
-    setAiThinking(true);
-    const timeBudget = AI_BASE_TIME_MS * (0.3 + strength * 1.7);
-    const timer = setTimeout(async () => {
-      const result = await findBestMove(chessRef.current, timeBudget, strength);
-      if (cancelled) return;
-      if (result.move) {
-        chessRef.current.move(result.move);
-        skipNextEvalRef.current = true;
-        setEvalScore(result.score);
-        setMateIn(result.mateIn);
-      }
-      setAiThinking(false);
-      refresh();
-    }, 30);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fen, mode, humanSide, resignedBy]);
-
-  // Eval-bar refresh for any position not already scored by the AI-move effect.
-  // Always evaluated at full engine strength, regardless of the AI opponent's
-  // difficulty setting — the bar should show the honest assessment.
-  useEffect(() => {
-    if (skipNextEvalRef.current) {
-      skipNextEvalRef.current = false;
-      return;
-    }
-    if (resignedBy) return; // eval already set directly by handleResign.
-    if (gameOver) {
-      if (chess.isCheckmate()) {
-        setEvalScore(chess.turn() === 'w' ? -100000 : 100000);
-        setMateIn(chess.turn() === 'b' ? 1 : -1);
-      } else {
-        setEvalScore(0);
-        setMateIn(null);
-      }
-      return;
-    }
-    let cancelled = false;
-    setEvalThinking(true);
-    const timer = setTimeout(async () => {
-      const result = await findBestMove(chessRef.current, 600, 1);
-      if (cancelled) return;
-      setEvalScore(result.score);
-      setMateIn(result.mateIn);
-      setEvalThinking(false);
-    }, 10);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fen, resignedBy]);
+  const { evalScore, mateIn, aiThinking, evalThinking, applyResignation, resetForNewGame } = useEngineEvaluation(
+    chessRef,
+    fen,
+    mode,
+    humanSide,
+    strength,
+    resignedBy,
+    refresh,
+  );
 
   const legalTargets = selected ? chess.moves({ square: selected, verbose: true }).map((m) => m.to as Square) : [];
 
@@ -192,10 +133,7 @@ export default function App() {
     setPendingPromotion(null);
     setResignedBy(null);
     setConfirmingResign(false);
-    setAiThinking(false);
-    setEvalScore(0);
-    setMateIn(null);
-    skipNextEvalRef.current = false;
+    resetForNewGame();
     refresh();
   };
 
@@ -214,9 +152,7 @@ export default function App() {
     stopSearch();
     setSelected(null);
     setPendingPromotion(null);
-    setAiThinking(false);
-    setEvalScore(resigningSide === 'w' ? -100000 : 100000);
-    setMateIn(null);
+    applyResignation(resigningSide);
     setResignedBy(resigningSide);
   };
 
