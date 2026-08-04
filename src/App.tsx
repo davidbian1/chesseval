@@ -7,7 +7,12 @@ import { PromotionPicker, type PromotionPiece } from './components/PromotionPick
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { stopSearch } from './engine/stockfish';
 import { useEngineEvaluation } from './hooks/useEngineEvaluation';
+import { gameResult } from './gameResult';
+import { isGameHistoryEnabled, saveGame } from './api/gamesClient';
+import { GameHistory } from './components/GameHistory';
 import './styles.css';
+
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 function statusText(chess: Chess, mode: GameMode, humanSide: Side, thinking: boolean, resignedBy: Side | null): string {
   if (resignedBy) {
@@ -41,6 +46,9 @@ export default function App() {
   const [pendingPromotion, setPendingPromotion] = useState<{ from: Square; to: Square; color: Side } | null>(null);
   const [resignedBy, setResignedBy] = useState<Side | null>(null);
   const [confirmingResign, setConfirmingResign] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const chess = chessRef.current;
   const gameOver = chess.isGameOver() || resignedBy !== null;
@@ -133,8 +141,22 @@ export default function App() {
     setPendingPromotion(null);
     setResignedBy(null);
     setConfirmingResign(false);
+    setSaveStatus('idle');
     resetForNewGame();
     refresh();
+  };
+
+  const handleSaveGame = async () => {
+    const result = gameResult(chess, resignedBy);
+    if (!result) return;
+    setSaveStatus('saving');
+    try {
+      await saveGame({ pgn: chess.pgn(), result, mode, humanSide: mode === 'ai' ? humanSide : null });
+      setSaveStatus('saved');
+      setHistoryRefreshKey((k) => k + 1);
+    } catch {
+      setSaveStatus('error');
+    }
   };
 
   const requestResign = () => {
@@ -228,6 +250,23 @@ export default function App() {
           status={statusText(chess, mode, humanSide, aiThinking, resignedBy)}
         />
       </div>
+      {isGameHistoryEnabled() && (
+        <div className="history-toolbar">
+          {gameOver && (
+            <button
+              className="new-game"
+              onClick={handleSaveGame}
+              disabled={saveStatus === 'saving' || saveStatus === 'saved'}
+            >
+              {saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'saving' ? 'Saving…' : 'Save Game'}
+            </button>
+          )}
+          <button className="toggle" onClick={() => setShowHistory(true)}>
+            Game History
+          </button>
+        </div>
+      )}
+      {showHistory && <GameHistory onClose={() => setShowHistory(false)} refreshKey={historyRefreshKey} />}
     </div>
   );
 }
