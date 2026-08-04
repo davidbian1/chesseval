@@ -7,7 +7,7 @@ on:
     branches: [master]
 
 jobs:
-  test:
+  frontend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,4 +29,48 @@ jobs:
         run: npm test
 
       - name: Build (includes typecheck)
+        run: npm run build
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: chesseval
+          POSTGRES_PASSWORD: chesseval
+          POSTGRES_DB: chesseval
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U chesseval"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://chesseval:chesseval@localhost:5432/chesseval
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Test
+        run: npm test
+
+      - name: Build
         run: npm run build
