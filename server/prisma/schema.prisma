@@ -1,0 +1,20 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Game {
+  id        Int      @id @default(autoincrement())
+  pgn       String
+  /// One of "1-0", "0-1", "1/2-1/2"
+  result    String
+  /// "human" (Human vs Human) or "ai" (Human vs AI)
+  mode      String
+  /// Which side the human played, when mode is "ai". Null for Human vs Human.
+  humanSide String?
+  createdAt DateTime @default(now())
+}

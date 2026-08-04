@@ -6,7 +6,9 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist', 'src-tauri'] },
+  // server/ is a separate Node package with its own eslint.config.js — this
+  // config's browser/React rules don't apply to it.
+  { ignores: ['dist', 'src-tauri', 'server'] },
   {
     files: ['**/*.{ts,tsx}'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
