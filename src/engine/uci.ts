@@ -40,17 +40,13 @@ export function applyUciLine(line: string, info: UciInfo): UciInfo {
  * Converts accumulated (side-to-move-relative) UCI info into the White's-
  * perspective score/mate values the rest of the app expects.
  */
-export function scoreFromUciInfo(
-  info: UciInfo,
-  whiteToMove: boolean,
-): { score: number; mateIn: number | null } {
+export function scoreFromUciInfo(info: UciInfo, whiteToMove: boolean): { score: number; mateIn: number | null } {
   const sign = whiteToMove ? 1 : -1;
   const score =
     info.scoreMateFromSideToMove !== null
       ? sign * (info.scoreMateFromSideToMove > 0 ? 100000 : -100000)
       : sign * (info.scoreCpFromSideToMove ?? 0);
-  const mateIn =
-    info.scoreMateFromSideToMove !== null ? sign * info.scoreMateFromSideToMove : null;
+  const mateIn = info.scoreMateFromSideToMove !== null ? sign * info.scoreMateFromSideToMove : null;
   return { score, mateIn };
 }
 
@@ -65,8 +61,5 @@ export function matchUciMove(legalMoves: Move[], uciMove: string | undefined): M
   const from = uciMove.slice(0, 2);
   const to = uciMove.slice(2, 4);
   const promotion = uciMove.length > 4 ? uciMove.slice(4) : undefined;
-  return (
-    legalMoves.find((m) => m.from === from && m.to === to && (m.promotion ?? undefined) === promotion) ??
-    null
-  );
+  return legalMoves.find((m) => m.from === from && m.to === to && (m.promotion ?? undefined) === promotion) ?? null;
 }

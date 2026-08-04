@@ -36,16 +36,10 @@ export function Controls({
   return (
     <div className="controls">
       <div className="control-row toggle-row">
-        <button
-          className={mode === 'human' ? 'toggle active' : 'toggle'}
-          onClick={() => onModeChange('human')}
-        >
+        <button className={mode === 'human' ? 'toggle active' : 'toggle'} onClick={() => onModeChange('human')}>
           Human vs Human
         </button>
-        <button
-          className={mode === 'ai' ? 'toggle active' : 'toggle'}
-          onClick={() => onModeChange('ai')}
-        >
+        <button className={mode === 'ai' ? 'toggle active' : 'toggle'} onClick={() => onModeChange('ai')}>
           Human vs AI
         </button>
       </div>
@@ -55,25 +49,17 @@ export function Controls({
           <div className="control-row">
             <label className="control-label">Play as</label>
             <div className="side-toggle">
-              <button
-                className={humanSide === 'w' ? 'toggle active' : 'toggle'}
-                onClick={() => onHumanSideChange('w')}
-              >
+              <button className={humanSide === 'w' ? 'toggle active' : 'toggle'} onClick={() => onHumanSideChange('w')}>
                 White
               </button>
-              <button
-                className={humanSide === 'b' ? 'toggle active' : 'toggle'}
-                onClick={() => onHumanSideChange('b')}
-              >
+              <button className={humanSide === 'b' ? 'toggle active' : 'toggle'} onClick={() => onHumanSideChange('b')}>
                 Black
               </button>
             </div>
           </div>
 
           <div className="control-row">
-            <label className="control-label">
-              AI strength — {strengthLabel(strength)}
-            </label>
+            <label className="control-label">AI strength — {strengthLabel(strength)}</label>
             <input
               type="range"
               min={0}
@@ -88,7 +74,9 @@ export function Controls({
       )}
 
       <div className="control-row button-row">
-        <button className="new-game" onClick={onNewGame}>Restart Game</button>
+        <button className="new-game" onClick={onNewGame}>
+          Restart Game
+        </button>
         <button className="resign" onClick={onResign} disabled={!canResign}>
           Resign
         </button>

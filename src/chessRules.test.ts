@@ -84,7 +84,7 @@ describe('chess.js move legality edge cases', () => {
 });
 
 describe('checkmate / stalemate / draw detection', () => {
-  it('detects checkmate (fool\'s mate)', () => {
+  it("detects checkmate (fool's mate)", () => {
     const chess = new Chess();
     chess.move('f3');
     chess.move('e5');

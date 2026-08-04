@@ -10,13 +10,7 @@ import './styles.css';
 
 const AI_BASE_TIME_MS = 1200;
 
-function statusText(
-  chess: Chess,
-  mode: GameMode,
-  humanSide: Side,
-  thinking: boolean,
-  resignedBy: Side | null,
-): string {
+function statusText(chess: Chess, mode: GameMode, humanSide: Side, thinking: boolean, resignedBy: Side | null): string {
   if (resignedBy) {
     const winner = resignedBy === 'w' ? 'Black' : 'White';
     const loser = resignedBy === 'w' ? 'White' : 'Black';
@@ -49,9 +43,7 @@ export default function App() {
   const [mateIn, setMateIn] = useState<number | null>(null);
   const [aiThinking, setAiThinking] = useState(false);
   const [evalThinking, setEvalThinking] = useState(false);
-  const [pendingPromotion, setPendingPromotion] = useState<{ from: Square; to: Square; color: Side } | null>(
-    null,
-  );
+  const [pendingPromotion, setPendingPromotion] = useState<{ from: Square; to: Square; color: Side } | null>(null);
   const [resignedBy, setResignedBy] = useState<Side | null>(null);
   const [confirmingResign, setConfirmingResign] = useState(false);
   const skipNextEvalRef = useRef(false);
@@ -126,9 +118,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fen, resignedBy]);
 
-  const legalTargets = selected
-    ? chess.moves({ square: selected, verbose: true }).map((m) => m.to as Square)
-    : [];
+  const legalTargets = selected ? chess.moves({ square: selected, verbose: true }).map((m) => m.to as Square) : [];
 
   const isHumanTurn = mode === 'human' || chess.turn() === humanSide;
   const canAct = !gameOver && !aiThinking && isHumanTurn && !pendingPromotion && !confirmingResign;

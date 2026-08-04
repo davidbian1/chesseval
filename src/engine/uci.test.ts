@@ -57,7 +57,7 @@ describe('scoreFromUciInfo', () => {
     expect(scoreFromUciInfo(info, true)).toEqual({ score: 50, mateIn: null });
   });
 
-  it('flips a side-to-move cp score into White\'s perspective when Black is to move', () => {
+  it("flips a side-to-move cp score into White's perspective when Black is to move", () => {
     const info: UciInfo = { depth: 10, scoreCpFromSideToMove: 50, scoreMateFromSideToMove: null };
     expect(scoreFromUciInfo(info, false)).toEqual({ score: -50, mateIn: null });
   });

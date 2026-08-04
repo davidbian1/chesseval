@@ -22,12 +22,7 @@ export function PromotionPicker({ color, onPick, onCancel }: PromotionPickerProp
         <div className="promotion-title">Promote to</div>
         <div className="promotion-choices">
           {CHOICES.map(({ piece, label }) => (
-            <button
-              key={piece}
-              className="promotion-choice"
-              aria-label={label}
-              onClick={() => onPick(piece)}
-            >
+            <button key={piece} className="promotion-choice" aria-label={label} onClick={() => onPick(piece)}>
               <span className={`piece ${color}`}>{UNICODE_PIECES[`${color}${piece}`]}</span>
             </button>
           ))}

@@ -44,10 +44,7 @@ class StockfishEngine {
     return result;
   }
 
-  async go(
-    chess: Chess,
-    opts: { movetimeMs: number; skillLevel: number },
-  ): Promise<SearchResult> {
+  async go(chess: Chess, opts: { movetimeMs: number; skillLevel: number }): Promise<SearchResult> {
     await this.readyPromise;
 
     const legalMoves = chess.moves({ verbose: true });

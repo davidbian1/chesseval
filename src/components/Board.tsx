@@ -11,7 +11,7 @@ export interface BoardSquare {
 }
 
 interface BoardProps {
-  board: (BoardSquare['piece'])[][]; // 8x8, rank8 -> rank1, from chess.js .board()
+  board: BoardSquare['piece'][][]; // 8x8, rank8 -> rank1, from chess.js .board()
   orientation: 'w' | 'b';
   selected: Square | null;
   legalTargets: Square[];
@@ -145,9 +145,7 @@ export function Board({
               {file === (orientation === 'w' ? 0 : 7) && (
                 <span className="coord rank-label">{rank <= 7 && 8 - rank}</span>
               )}
-              {rank === (orientation === 'w' ? 7 : 0) && (
-                <span className="coord file-label">{FILES[file]}</span>
-              )}
+              {rank === (orientation === 'w' ? 7 : 0) && <span className="coord file-label">{FILES[file]}</span>}
               {piece && (
                 <span
                   className={`piece ${piece.color}${isDraggable ? ' draggable' : ''}${isGhostSource ? ' dragging-source' : ''}`}
