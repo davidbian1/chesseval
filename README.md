@@ -1,6 +1,10 @@
 # chesseval
 
+[![CI](https://github.com/davidbian1/chesseval/actions/workflows/ci.yml/badge.svg)](https://github.com/davidbian1/chesseval/actions/workflows/ci.yml)
+
 A minimalist chess game with a live evaluation bar, playable in the browser or as a native desktop app.
+
+**Live demo:** [davidbian1.github.io/chesseval](https://davidbian1.github.io/chesseval/)
 
 ## Features
 
@@ -38,12 +42,28 @@ npm run tauri build
 
 The installer/executable is written to `src-tauri/target/release/bundle/`.
 
+## Development
+
+```sh
+npm test           # run the Vitest suite once
+npm run test:watch # re-run on file changes
+npm run lint        # ESLint
+npm run format      # Prettier --write
+npm run format:check
+```
+
+CI (`.github/workflows/ci.yml`) runs lint, format-check, test, and build on every push and pull request
+against `master`. Pushes to `master` also trigger `.github/workflows/deploy.yml`, which builds the web app
+and publishes it to GitHub Pages.
+
 ## Project structure
 
 - `src/engine/stockfish.ts` — Worker wrapper around Stockfish, speaks UCI, exposes a simple `findBestMove()` API
+- `src/engine/uci.ts` — pure UCI info-line parsing, unit tested independent of the Worker
 - `public/stockfish-18-lite-single.{js,wasm}` — the bundled engine (from the [`stockfish`](https://www.npmjs.com/package/stockfish) npm package)
 - `src/components/Board.tsx` — the chessboard UI
 - `src/components/EvalBar.tsx` — the evaluation bar
+- `src/components/evalBarDisplay.ts` — pure score-to-percent/label math for the eval bar, unit tested
 - `src/components/Controls.tsx` — mode toggle, side selector, strength slider
 - `src/App.tsx` — game state and wiring
 - `src-tauri/` — Tauri desktop shell (Rust)
