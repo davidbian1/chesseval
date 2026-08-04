@@ -61,11 +61,13 @@ and publishes it to GitHub Pages.
 - `src/engine/stockfish.ts` — Worker wrapper around Stockfish, speaks UCI, exposes a simple `findBestMove()` API
 - `src/engine/uci.ts` — pure UCI info-line parsing, unit tested independent of the Worker
 - `public/stockfish-18-lite-single.{js,wasm}` — the bundled engine (from the [`stockfish`](https://www.npmjs.com/package/stockfish) npm package)
+- `src/hooks/useEngineEvaluation.ts` — owns the AI-move search and eval-bar refresh effects
 - `src/components/Board.tsx` — the chessboard UI
 - `src/components/EvalBar.tsx` — the evaluation bar
 - `src/components/evalBarDisplay.ts` — pure score-to-percent/label math for the eval bar, unit tested
 - `src/components/Controls.tsx` — mode toggle, side selector, strength slider
-- `src/App.tsx` — game state and wiring
+- `src/components/ErrorBoundary.tsx` — catches render-time errors so the app fails visibly instead of going blank
+- `src/App.tsx` — game state and UI wiring
 - `src-tauri/` — Tauri desktop shell (Rust)
 
 ## License
