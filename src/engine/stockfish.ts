@@ -1,4 +1,5 @@
 import type { Chess, Move } from 'chess.js';
+import { applyUciLine, INITIAL_UCI_INFO, matchUciMove, parseBestMoveToken, scoreFromUciInfo } from './uci';
 
 export interface SearchResult {
   move: Move | null;
@@ -10,12 +11,6 @@ export interface SearchResult {
 }
 
 const ENGINE_URL = '/stockfish-18-lite-single.js';
-
-interface UciInfo {
-  depth: number;
-  scoreCpFromSideToMove: number | null;
-  scoreMateFromSideToMove: number | null;
-}
 
 class StockfishEngine {
   private worker: Worker;
@@ -66,35 +61,17 @@ class StockfishEngine {
     return this.enqueue(
       () =>
         new Promise<SearchResult>((resolve) => {
-          const info: UciInfo = { depth: 0, scoreCpFromSideToMove: null, scoreMateFromSideToMove: null };
+          let info = INITIAL_UCI_INFO;
 
           const handler = (e: MessageEvent<string>) => {
             const line = e.data;
             if (line.startsWith('info')) {
-              const depthMatch = /\bdepth (\d+)/.exec(line);
-              const cpMatch = /\bscore cp (-?\d+)/.exec(line);
-              const mateMatch = /\bscore mate (-?\d+)/.exec(line);
-              if (depthMatch) info.depth = parseInt(depthMatch[1], 10);
-              if (cpMatch) {
-                info.scoreCpFromSideToMove = parseInt(cpMatch[1], 10);
-                info.scoreMateFromSideToMove = null;
-              } else if (mateMatch) {
-                info.scoreMateFromSideToMove = parseInt(mateMatch[1], 10);
-                info.scoreCpFromSideToMove = null;
-              }
+              info = applyUciLine(line, info);
             } else if (line.startsWith('bestmove')) {
               this.worker.removeEventListener('message', handler);
 
-              const uciMove = line.split(' ')[1];
-              const move = matchUciMove(legalMoves, uciMove);
-
-              const sign = whiteToMove ? 1 : -1;
-              const score =
-                info.scoreMateFromSideToMove !== null
-                  ? sign * (info.scoreMateFromSideToMove > 0 ? 100000 : -100000)
-                  : sign * (info.scoreCpFromSideToMove ?? 0);
-              const mateIn =
-                info.scoreMateFromSideToMove !== null ? sign * info.scoreMateFromSideToMove : null;
+              const move = matchUciMove(legalMoves, parseBestMoveToken(line));
+              const { score, mateIn } = scoreFromUciInfo(info, whiteToMove);
 
               resolve({ move, score, depth: info.depth, mateIn });
             }
@@ -113,16 +90,6 @@ class StockfishEngine {
   stop(): void {
     this.worker.postMessage('stop');
   }
-}
-
-function matchUciMove(legalMoves: Move[], uciMove: string | undefined): Move | null {
-  if (!uciMove || uciMove === '(none)') return null;
-  const from = uciMove.slice(0, 2);
-  const to = uciMove.slice(2, 4);
-  const promotion = uciMove.length > 4 ? uciMove.slice(4) : undefined;
-  return (
-    legalMoves.find((m) => m.from === from && m.to === to && (m.promotion ?? undefined) === promotion) ?? null
-  );
 }
 
 let engine: StockfishEngine | null = null;
