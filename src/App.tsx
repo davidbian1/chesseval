@@ -1,24 +1,36 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Chess, type Square } from 'chess.js';
 import { Board } from './components/Board';
 import { EvalBar } from './components/EvalBar';
+import { Clock } from './components/Clock';
 import { Controls, type GameMode, type Side } from './components/Controls';
 import { PromotionPicker, type PromotionPiece } from './components/PromotionPicker';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { stopSearch } from './engine/stockfish';
 import { useEngineEvaluation } from './hooks/useEngineEvaluation';
+import { useChessClock } from './hooks/useChessClock';
+import { DEFAULT_TIME_CONTROL, flaggedSide, type TimeControl } from './clock';
 import { gameResult } from './gameResult';
 import { isGameHistoryEnabled, saveGame } from './api/gamesClient';
 import { GameHistory } from './components/GameHistory';
 import './styles.css';
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+type TerminationReason = 'resignation' | 'timeout' | null;
 
-function statusText(chess: Chess, mode: GameMode, humanSide: Side, thinking: boolean, resignedBy: Side | null): string {
-  if (resignedBy) {
-    const winner = resignedBy === 'w' ? 'Black' : 'White';
-    const loser = resignedBy === 'w' ? 'White' : 'Black';
-    return `${loser} resigns — ${winner} wins`;
+function statusText(
+  chess: Chess,
+  mode: GameMode,
+  humanSide: Side,
+  thinking: boolean,
+  externalLoser: Side | null,
+  terminationReason: TerminationReason,
+): string {
+  if (externalLoser) {
+    const winner = externalLoser === 'w' ? 'Black' : 'White';
+    const loser = externalLoser === 'w' ? 'White' : 'Black';
+    const cause = terminationReason === 'timeout' ? "'s time runs out" : ' resigns';
+    return `${loser}${cause} — ${winner} wins`;
   }
   if (chess.isCheckmate()) {
     const winner = chess.turn() === 'w' ? 'Black' : 'White';
@@ -45,27 +57,50 @@ export default function App() {
   const [strength, setStrength] = useState(0.5);
   const [pendingPromotion, setPendingPromotion] = useState<{ from: Square; to: Square; color: Side } | null>(null);
   const [resignedBy, setResignedBy] = useState<Side | null>(null);
+  const [timedOutBy, setTimedOutBy] = useState<Side | null>(null);
   const [confirmingResign, setConfirmingResign] = useState(false);
+  const [timeControl, setTimeControl] = useState<TimeControl>(DEFAULT_TIME_CONTROL);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [showHistory, setShowHistory] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
 
   const chess = chessRef.current;
-  const gameOver = chess.isGameOver() || resignedBy !== null;
+  // Either kind of forced loss (resignation or flag fall) ends the game the
+  // same way chess.js's own game-over checks do, just outside its rules.
+  const externalLoser = resignedBy ?? timedOutBy;
+  const terminationReason: TerminationReason = resignedBy ? 'resignation' : timedOutBy ? 'timeout' : null;
+  const gameOver = chess.isGameOver() || externalLoser !== null;
 
   const refresh = useCallback(() => {
     setFen(chessRef.current.fen());
   }, []);
 
-  const { evalScore, mateIn, aiThinking, evalThinking, applyResignation, resetForNewGame } = useEngineEvaluation(
+  const { evalScore, mateIn, aiThinking, evalThinking, applyExternalLoss, resetForNewGame } = useEngineEvaluation(
     chessRef,
     fen,
     mode,
     humanSide,
     strength,
-    resignedBy,
+    externalLoser,
     refresh,
   );
+
+  const { whiteMs, blackMs, resetClock } = useChessClock(timeControl, chess.turn(), fen, gameOver);
+
+  // Flag fall: whichever side's clock hits zero loses. A position where the
+  // opponent has no mating material left is already covered by chess.js's
+  // own isGameOver()/isInsufficientMaterial() check above — that position
+  // ends the game (as a draw) the moment it arises, before any clock could
+  // reach zero in it, so no separate handling is needed here.
+  useEffect(() => {
+    if (gameOver) return;
+    const flagged = flaggedSide({ whiteMs, blackMs });
+    if (!flagged) return;
+    stopSearch();
+    applyExternalLoss(flagged);
+    setTimedOutBy(flagged);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [whiteMs, blackMs, gameOver]);
 
   const legalTargets = selected ? chess.moves({ square: selected, verbose: true }).map((m) => m.to as Square) : [];
 
@@ -140,14 +175,16 @@ export default function App() {
     setSelected(null);
     setPendingPromotion(null);
     setResignedBy(null);
+    setTimedOutBy(null);
     setConfirmingResign(false);
     setSaveStatus('idle');
     resetForNewGame();
+    resetClock(chessRef.current.fen());
     refresh();
   };
 
   const handleSaveGame = async () => {
-    const result = gameResult(chess, resignedBy);
+    const result = gameResult(chess, externalLoser);
     if (!result) return;
     setSaveStatus('saving');
     try {
@@ -174,7 +211,7 @@ export default function App() {
     stopSearch();
     setSelected(null);
     setPendingPromotion(null);
-    applyResignation(resigningSide);
+    applyExternalLoss(resigningSide);
     setResignedBy(resigningSide);
   };
 
@@ -194,6 +231,9 @@ export default function App() {
   }
 
   const orientation: Side = mode === 'ai' ? humanSide : 'w';
+  const topSide: Side = orientation === 'w' ? 'b' : 'w';
+  const bottomSide: Side = orientation;
+  const turnActive = !gameOver && chess.turn();
 
   return (
     <div className="app">
@@ -203,22 +243,26 @@ export default function App() {
           score={evalScore}
           mateIn={mateIn}
           thinking={aiThinking || evalThinking}
-          resultLabel={resignedBy ? (resignedBy === 'w' ? '0–1' : '1–0') : null}
+          resultLabel={externalLoser ? (externalLoser === 'w' ? '0–1' : '1–0') : null}
         />
-        <Board
-          board={chess.board()}
-          orientation={orientation}
-          selected={selected}
-          legalTargets={legalTargets}
-          lastMove={lastMove ? { from: lastMove.from as Square, to: lastMove.to as Square } : null}
-          inCheckSquare={inCheckSquare}
-          onSquareClick={handleSquareClick}
-          onPieceDragStart={handlePieceDragStart}
-          onDrop={handleDrop}
-          onDragEnd={() => setSelected(null)}
-          canDrag={canAct}
-          turnColor={chess.turn()}
-        />
+        <div className="board-column">
+          <Clock ms={topSide === 'w' ? whiteMs : blackMs} active={turnActive === topSide} />
+          <Board
+            board={chess.board()}
+            orientation={orientation}
+            selected={selected}
+            legalTargets={legalTargets}
+            lastMove={lastMove ? { from: lastMove.from as Square, to: lastMove.to as Square } : null}
+            inCheckSquare={inCheckSquare}
+            onSquareClick={handleSquareClick}
+            onPieceDragStart={handlePieceDragStart}
+            onDrop={handleDrop}
+            onDragEnd={() => setSelected(null)}
+            canDrag={canAct}
+            turnColor={chess.turn()}
+          />
+          <Clock ms={bottomSide === 'w' ? whiteMs : blackMs} active={turnActive === bottomSide} />
+        </div>
         {pendingPromotion && (
           <PromotionPicker color={pendingPromotion.color} onPick={completePromotion} onCancel={cancelPromotion} />
         )}
@@ -244,10 +288,13 @@ export default function App() {
           }}
           strength={strength}
           onStrengthChange={setStrength}
+          timeControl={timeControl}
+          onTimeControlChange={setTimeControl}
+          timeControlLocked={history.length > 0}
           onNewGame={handleNewGame}
           onResign={requestResign}
           canResign={!gameOver}
-          status={statusText(chess, mode, humanSide, aiThinking, resignedBy)}
+          status={statusText(chess, mode, humanSide, aiThinking, externalLoser, terminationReason)}
         />
       </div>
       {isGameHistoryEnabled() && (

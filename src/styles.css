@@ -50,6 +50,12 @@ body {
   gap: 20px;
 }
 
+.board-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .board {
   display: grid;
   grid-template-columns: repeat(8, 62px);
@@ -57,6 +63,31 @@ body {
   border: 6px solid var(--wood-darker);
   border-radius: 3px;
   box-shadow: 0 8px 24px rgba(58, 47, 34, 0.25);
+  position: relative;
+}
+
+.clock {
+  align-self: flex-end;
+  font-variant-numeric: tabular-nums;
+  font-size: 20px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  color: var(--ink);
+  min-width: 64px;
+  text-align: center;
+}
+
+.clock-active {
+  background: var(--wood-darker);
+  color: #fbf6ec;
+  border-color: var(--wood-darker);
+}
+
+.clock-low.clock-active {
+  background: #96422f;
+  border-color: #96422f;
 }
 
 .square {
@@ -272,6 +303,22 @@ body {
 .strength-slider {
   width: 100%;
   accent-color: var(--wood-darker);
+}
+
+.time-control-select {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--ink);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.time-control-select:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .button-row {

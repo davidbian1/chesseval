@@ -10,8 +10,8 @@ export interface EngineEvaluation {
   mateIn: number | null;
   aiThinking: boolean;
   evalThinking: boolean;
-  /** Sets the eval bar to reflect one side resigning. */
-  applyResignation: (resigningSide: Side) => void;
+  /** Sets the eval bar to reflect a side losing for a reason outside chess.js's rules (resignation, timeout). */
+  applyExternalLoss: (losingSide: Side) => void;
   /** Resets eval-bar state for a fresh game. */
   resetForNewGame: () => void;
 }
@@ -28,7 +28,7 @@ export function useEngineEvaluation(
   mode: GameMode,
   humanSide: Side,
   strength: number,
-  resignedBy: Side | null,
+  externalLoser: Side | null,
   refresh: () => void,
 ): EngineEvaluation {
   const [evalScore, setEvalScore] = useState(0);
@@ -38,7 +38,7 @@ export function useEngineEvaluation(
   const skipNextEvalRef = useRef(false);
 
   const chess = chessRef.current;
-  const gameOver = chess.isGameOver() || resignedBy !== null;
+  const gameOver = chess.isGameOver() || externalLoser !== null;
 
   // AI move effect.
   useEffect(() => {
@@ -66,7 +66,7 @@ export function useEngineEvaluation(
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fen, mode, humanSide, resignedBy]);
+  }, [fen, mode, humanSide, externalLoser]);
 
   // Eval-bar refresh for any position not already scored by the AI-move effect.
   // Always evaluated at full engine strength, regardless of the AI opponent's
@@ -76,7 +76,7 @@ export function useEngineEvaluation(
       skipNextEvalRef.current = false;
       return;
     }
-    if (resignedBy) return; // eval already set directly by applyResignation.
+    if (externalLoser) return; // eval already set directly by applyExternalLoss.
     if (gameOver) {
       if (chess.isCheckmate()) {
         setEvalScore(chess.turn() === 'w' ? -100000 : 100000);
@@ -101,16 +101,16 @@ export function useEngineEvaluation(
       clearTimeout(timer);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fen, resignedBy]);
+  }, [fen, externalLoser]);
 
   return {
     evalScore,
     mateIn,
     aiThinking,
     evalThinking,
-    applyResignation: (resigningSide) => {
+    applyExternalLoss: (losingSide) => {
       setAiThinking(false);
-      setEvalScore(resigningSide === 'w' ? -100000 : 100000);
+      setEvalScore(losingSide === 'w' ? -100000 : 100000);
       setMateIn(null);
     },
     resetForNewGame: () => {

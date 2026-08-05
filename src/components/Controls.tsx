@@ -1,3 +1,5 @@
+import { TIME_CONTROLS, type TimeControl } from '../clock';
+
 export type GameMode = 'human' | 'ai';
 export type Side = 'w' | 'b';
 
@@ -8,6 +10,10 @@ interface ControlsProps {
   onHumanSideChange: (side: Side) => void;
   strength: number; // 0..1
   onStrengthChange: (strength: number) => void;
+  timeControl: TimeControl;
+  onTimeControlChange: (timeControl: TimeControl) => void;
+  /** True once the current game has moves — the clock can't be changed mid-game. */
+  timeControlLocked: boolean;
   onNewGame: () => void;
   onResign: () => void;
   canResign: boolean;
@@ -28,6 +34,9 @@ export function Controls({
   onHumanSideChange,
   strength,
   onStrengthChange,
+  timeControl,
+  onTimeControlChange,
+  timeControlLocked,
   onNewGame,
   onResign,
   canResign,
@@ -42,6 +51,28 @@ export function Controls({
         <button className={mode === 'ai' ? 'toggle active' : 'toggle'} onClick={() => onModeChange('ai')}>
           Human vs AI
         </button>
+      </div>
+
+      <div className="control-row">
+        <label className="control-label" htmlFor="time-control-select">
+          Time control
+        </label>
+        <select
+          id="time-control-select"
+          className="time-control-select"
+          value={timeControl.id}
+          disabled={timeControlLocked}
+          onChange={(e) => {
+            const next = TIME_CONTROLS.find((tc) => tc.id === e.target.value);
+            if (next) onTimeControlChange(next);
+          }}
+        >
+          {TIME_CONTROLS.map((tc) => (
+            <option key={tc.id} value={tc.id}>
+              {tc.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       {mode === 'ai' && (
