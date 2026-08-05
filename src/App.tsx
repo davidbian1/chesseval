@@ -10,6 +10,7 @@ import { stopSearch } from './engine/stockfish';
 import { useEngineEvaluation } from './hooks/useEngineEvaluation';
 import { useChessClock } from './hooks/useChessClock';
 import { DEFAULT_TIME_CONTROL, flaggedSide, type TimeControl } from './clock';
+import { pseudoLegalPremoveTargets } from './premove';
 import { gameResult } from './gameResult';
 import { isGameHistoryEnabled, saveGame } from './api/gamesClient';
 import { GameHistory } from './components/GameHistory';
@@ -52,6 +53,7 @@ export default function App() {
   const chessRef = useRef(new Chess());
   const [fen, setFen] = useState(chessRef.current.fen());
   const [selected, setSelected] = useState<Square | null>(null);
+  const [premove, setPremove] = useState<{ from: Square; to: Square } | null>(null);
   const [mode, setMode] = useState<GameMode>('ai');
   const [humanSide, setHumanSide] = useState<Side>('w');
   const [strength, setStrength] = useState(0.5);
@@ -102,17 +104,35 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [whiteMs, blackMs, gameOver]);
 
-  const legalTargets = selected ? chess.moves({ square: selected, verbose: true }).map((m) => m.to as Square) : [];
-
   const isHumanTurn = mode === 'human' || chess.turn() === humanSide;
   const canAct = !gameOver && !aiThinking && isHumanTurn && !pendingPromotion && !confirmingResign;
+  // Premoving only makes sense against an opponent who isn't sharing your
+  // screen and keyboard — i.e. the AI, not local Human vs Human hotseat play.
+  const canPremove = mode === 'ai' && !gameOver && !isHumanTurn && !confirmingResign && !pendingPromotion;
 
-  /** Applies a move if it's unambiguous, or opens the promotion picker if it isn't. */
-  const attemptMove = (from: Square, to: Square): 'moved' | 'promotion-pending' | 'invalid' => {
+  const legalTargets = !selected
+    ? []
+    : canAct
+      ? chess.moves({ square: selected, verbose: true }).map((m) => m.to as Square)
+      : canPremove
+        ? pseudoLegalPremoveTargets(fen, selected)
+        : [];
+
+  /** Applies a move if it's unambiguous, or opens the promotion picker if it isn't (or auto-promotes for a premove). */
+  const attemptMove = (
+    from: Square,
+    to: Square,
+    autoPromote?: PromotionPiece,
+  ): 'moved' | 'promotion-pending' | 'invalid' => {
     const matches = chess.moves({ square: from, verbose: true }).filter((m) => m.to === to);
     if (matches.length === 0) return 'invalid';
     if (matches.length === 1) {
       chess.move(matches[0]);
+      refresh();
+      return 'moved';
+    }
+    if (autoPromote) {
+      chess.move(matches.find((m) => m.promotion === autoPromote) ?? matches[0]);
       refresh();
       return 'moved';
     }
@@ -121,27 +141,63 @@ export default function App() {
     return 'promotion-pending';
   };
 
+  // Once it's actually the human's turn, try the queued premove for real —
+  // it either plays (auto-queening on promotion, like most chess UIs default
+  // to) or, if the position no longer allows it, is silently discarded.
+  useEffect(() => {
+    if (!premove || gameOver || chess.turn() !== humanSide) return;
+    attemptMove(premove.from, premove.to, 'q');
+    setPremove(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fen, premove]);
+
   const handleSquareClick = (square: Square) => {
-    if (!canAct) return;
+    if (canAct) {
+      if (selected) {
+        if (selected === square) {
+          setSelected(null);
+          return;
+        }
+        const outcome = attemptMove(selected, square);
+        if (outcome === 'invalid') {
+          // Clicked another square: reselect if it has a movable piece.
+          const piece = chess.get(square);
+          setSelected(piece && piece.color === chess.turn() ? square : null);
+        } else {
+          setSelected(null);
+        }
+        return;
+      }
+
+      const piece = chess.get(square);
+      if (piece && piece.color === chess.turn()) {
+        setSelected(square);
+      }
+      return;
+    }
+
+    if (!canPremove) return;
 
     if (selected) {
       if (selected === square) {
         setSelected(null);
         return;
       }
-      const outcome = attemptMove(selected, square);
-      if (outcome === 'invalid') {
-        // Clicked another square: reselect if it has a movable piece.
-        const piece = chess.get(square);
-        setSelected(piece && piece.color === chess.turn() ? square : null);
-      } else {
+      if (pseudoLegalPremoveTargets(fen, selected).includes(square)) {
+        setPremove({ from: selected, to: square });
         setSelected(null);
+        return;
       }
+      const piece = chess.get(square);
+      setSelected(piece && piece.color === humanSide ? square : null);
       return;
     }
 
+    // Any other click while a premove is queued cancels it — clicking a new
+    // own piece then starts picking a replacement.
+    setPremove(null);
     const piece = chess.get(square);
-    if (piece && piece.color === chess.turn()) {
+    if (piece && piece.color === humanSide) {
       setSelected(square);
     }
   };
@@ -173,6 +229,7 @@ export default function App() {
     stopSearch();
     chessRef.current = new Chess();
     setSelected(null);
+    setPremove(null);
     setPendingPromotion(null);
     setResignedBy(null);
     setTimedOutBy(null);
@@ -210,6 +267,7 @@ export default function App() {
     const resigningSide: Side = mode === 'ai' ? humanSide : chess.turn();
     stopSearch();
     setSelected(null);
+    setPremove(null);
     setPendingPromotion(null);
     applyExternalLoss(resigningSide);
     setResignedBy(resigningSide);
@@ -254,6 +312,7 @@ export default function App() {
             legalTargets={legalTargets}
             lastMove={lastMove ? { from: lastMove.from as Square, to: lastMove.to as Square } : null}
             inCheckSquare={inCheckSquare}
+            premove={premove}
             onSquareClick={handleSquareClick}
             onPieceDragStart={handlePieceDragStart}
             onDrop={handleDrop}
@@ -280,11 +339,13 @@ export default function App() {
             stopSearch();
             setMode(m);
             setSelected(null);
+            setPremove(null);
           }}
           humanSide={humanSide}
           onHumanSideChange={(side) => {
             stopSearch();
             setHumanSide(side);
+            setPremove(null);
           }}
           strength={strength}
           onStrengthChange={setStrength}

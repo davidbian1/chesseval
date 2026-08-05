@@ -118,6 +118,13 @@ body {
   background: rgba(255, 215, 0, 0.22);
 }
 
+.square.premove::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(64, 110, 200, 0.35);
+}
+
 .square.in-check::after {
   content: '';
   position: absolute;

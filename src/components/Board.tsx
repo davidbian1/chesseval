@@ -17,6 +17,8 @@ interface BoardProps {
   legalTargets: Square[];
   lastMove: { from: Square; to: Square } | null;
   inCheckSquare: Square | null;
+  /** A queued premove, highlighted distinctly from the current selection. */
+  premove?: { from: Square; to: Square } | null;
   onSquareClick: (square: Square) => void;
   onPieceDragStart: (square: Square) => void;
   onDrop: (from: Square, to: Square) => void;
@@ -57,6 +59,7 @@ export function Board({
   legalTargets,
   lastMove,
   inCheckSquare,
+  premove,
   onSquareClick,
   onPieceDragStart,
   onDrop,
@@ -127,6 +130,7 @@ export function Board({
           const isTarget = legalTargets.includes(square);
           const isLastMove = lastMove && (lastMove.from === square || lastMove.to === square);
           const isCheck = inCheckSquare === square;
+          const isPremove = premove && (premove.from === square || premove.to === square);
           const isDraggable = canDrag && !!piece && piece.color === turnColor;
           const isGhostSource = ghost?.square === square;
 
@@ -136,6 +140,7 @@ export function Board({
             isSelected ? 'selected' : '',
             isLastMove ? 'last-move' : '',
             isCheck ? 'in-check' : '',
+            isPremove ? 'premove' : '',
           ]
             .filter(Boolean)
             .join(' ');
