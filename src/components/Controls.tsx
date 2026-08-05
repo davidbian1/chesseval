@@ -1,7 +1,10 @@
 import { TIME_CONTROLS, type TimeControl } from '../clock';
 import { PIECE_THEMES, type PieceTheme } from '../pieceThemes';
+import { OnlineLobby } from './OnlineLobby';
+import type { OnlineGame } from '../hooks/useOnlineGame';
+import { isBackendConfigured } from '../api/backend';
 
-export type GameMode = 'human' | 'ai';
+export type GameMode = 'human' | 'ai' | 'online';
 export type Side = 'w' | 'b';
 
 interface ControlsProps {
@@ -17,7 +20,9 @@ interface ControlsProps {
   timeControlLocked: boolean;
   pieceTheme: PieceTheme;
   onPieceThemeChange: (theme: PieceTheme) => void;
+  onlineGame: OnlineGame;
   onNewGame: () => void;
+  canRestart: boolean;
   onResign: () => void;
   canResign: boolean;
   status: string;
@@ -42,7 +47,9 @@ export function Controls({
   timeControlLocked,
   pieceTheme,
   onPieceThemeChange,
+  onlineGame,
   onNewGame,
+  canRestart,
   onResign,
   canResign,
   status,
@@ -56,7 +63,24 @@ export function Controls({
         <button className={mode === 'ai' ? 'toggle active' : 'toggle'} onClick={() => onModeChange('ai')}>
           Human vs AI
         </button>
+        {isBackendConfigured() && (
+          <button className={mode === 'online' ? 'toggle active' : 'toggle'} onClick={() => onModeChange('online')}>
+            Play Online
+          </button>
+        )}
       </div>
+
+      {mode === 'online' && (
+        <OnlineLobby
+          status={onlineGame.status}
+          roomId={onlineGame.roomId}
+          color={onlineGame.color}
+          errorMessage={onlineGame.errorMessage}
+          onCreate={onlineGame.createRoom}
+          onJoin={onlineGame.joinRoom}
+          onLeave={onlineGame.disconnect}
+        />
+      )}
 
       <div className="control-row">
         <label className="control-label" htmlFor="time-control-select">
@@ -128,7 +152,7 @@ export function Controls({
       )}
 
       <div className="control-row button-row">
-        <button className="new-game" onClick={onNewGame}>
+        <button className="new-game" onClick={onNewGame} disabled={!canRestart}>
           Restart Game
         </button>
         <button className="resign" onClick={onResign} disabled={!canResign}>

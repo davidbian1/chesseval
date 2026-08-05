@@ -365,6 +365,11 @@ body {
   transform: scale(0.96);
 }
 
+.new-game:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .resign {
   font-family: inherit;
   font-size: 13px;
@@ -448,6 +453,34 @@ body {
 
 .promotion-choice:active {
   transform: scale(0.94);
+}
+
+.online-lobby {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.online-join-row {
+  display: flex;
+  gap: 8px;
+}
+
+.online-code-input {
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.online-room-code {
+  font-size: 13px;
 }
 
 .history-toolbar {

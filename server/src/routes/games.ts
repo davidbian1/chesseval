@@ -4,7 +4,7 @@ import { prisma } from '../db.js';
 export const gamesRouter = Router();
 
 const VALID_RESULTS = new Set(['1-0', '0-1', '1/2-1/2']);
-const VALID_MODES = new Set(['human', 'ai']);
+const VALID_MODES = new Set(['human', 'ai', 'online']);
 const VALID_SIDES = new Set(['w', 'b']);
 
 function parseId(raw: string): number | null {
@@ -56,7 +56,7 @@ gamesRouter.post('/', async (req, res) => {
     return;
   }
   if (!VALID_MODES.has(mode)) {
-    res.status(400).json({ error: 'mode must be "human" or "ai"' });
+    res.status(400).json({ error: 'mode must be "human", "ai", or "online"' });
     return;
   }
   if (humanSide !== undefined && humanSide !== null && !VALID_SIDES.has(humanSide)) {

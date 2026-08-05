@@ -9,6 +9,7 @@ import { ConfirmDialog } from './components/ConfirmDialog';
 import { stopSearch } from './engine/stockfish';
 import { useEngineEvaluation } from './hooks/useEngineEvaluation';
 import { useChessClock } from './hooks/useChessClock';
+import { useOnlineGame } from './hooks/useOnlineGame';
 import { DEFAULT_TIME_CONTROL, flaggedSide, type TimeControl } from './clock';
 import { pseudoLegalPremoveTargets } from './premove';
 import { loadPieceTheme, savePieceTheme, type PieceTheme } from './pieceThemes';
@@ -43,9 +44,10 @@ function statusText(
   if (chess.isDraw()) return 'Draw';
   if (thinking) return 'Engine is thinking…';
   const toMove = chess.turn() === 'w' ? 'White' : 'Black';
-  if (mode === 'ai') {
-    const isHumanTurn = chess.turn() === humanSide;
-    return `${toMove} to move${isHumanTurn ? ' (you)' : ' (engine)'}${chess.isCheck() ? ' — check' : ''}`;
+  if (mode === 'ai' || mode === 'online') {
+    const isMyTurn = chess.turn() === humanSide;
+    const opponentLabel = mode === 'ai' ? 'engine' : 'opponent';
+    return `${toMove} to move${isMyTurn ? ' (you)' : ` (${opponentLabel})`}${chess.isCheck() ? ' — check' : ''}`;
   }
   return `${toMove} to move${chess.isCheck() ? ' — check' : ''}`;
 }
@@ -96,6 +98,25 @@ export default function App() {
 
   const { whiteMs, blackMs, resetClock } = useChessClock(timeControl, chess.turn(), fen, gameOver);
 
+  const handleOnlineResigned = (resigningSide: Side) => {
+    stopSearch();
+    setSelected(null);
+    setPremove(null);
+    setPendingPromotion(null);
+    applyExternalLoss(resigningSide);
+    setResignedBy(resigningSide);
+  };
+
+  const onlineGame = useOnlineGame(chessRef, refresh, handleOnlineResigned);
+
+  // The server assigns which color we're playing once connected — mirror it
+  // into humanSide so canAct/orientation/premove all keep working unchanged.
+  useEffect(() => {
+    if (onlineGame.color) setHumanSide(onlineGame.color);
+  }, [onlineGame.color]);
+
+  const opponentReady = mode !== 'online' || onlineGame.status === 'playing';
+
   // Flag fall: whichever side's clock hits zero loses. A position where the
   // opponent has no mating material left is already covered by chess.js's
   // own isGameOver()/isInsufficientMaterial() check above — that position
@@ -112,10 +133,17 @@ export default function App() {
   }, [whiteMs, blackMs, gameOver]);
 
   const isHumanTurn = mode === 'human' || chess.turn() === humanSide;
-  const canAct = !gameOver && !aiThinking && isHumanTurn && !pendingPromotion && !confirmingResign;
+  const canAct = !gameOver && !aiThinking && isHumanTurn && !pendingPromotion && !confirmingResign && opponentReady;
   // Premoving only makes sense against an opponent who isn't sharing your
-  // screen and keyboard — i.e. the AI, not local Human vs Human hotseat play.
-  const canPremove = mode === 'ai' && !gameOver && !isHumanTurn && !confirmingResign && !pendingPromotion;
+  // screen and keyboard — the AI or a remote player, not local Human vs
+  // Human hotseat play.
+  const canPremove =
+    (mode === 'ai' || mode === 'online') &&
+    !gameOver &&
+    !isHumanTurn &&
+    !confirmingResign &&
+    !pendingPromotion &&
+    opponentReady;
 
   const legalTargets = !selected
     ? []
@@ -134,13 +162,19 @@ export default function App() {
     const matches = chess.moves({ square: from, verbose: true }).filter((m) => m.to === to);
     if (matches.length === 0) return 'invalid';
     if (matches.length === 1) {
-      chess.move(matches[0]);
-      refresh();
+      if (mode === 'online') onlineGame.sendMove(from, to);
+      else {
+        chess.move(matches[0]);
+        refresh();
+      }
       return 'moved';
     }
     if (autoPromote) {
-      chess.move(matches.find((m) => m.promotion === autoPromote) ?? matches[0]);
-      refresh();
+      if (mode === 'online') onlineGame.sendMove(from, to, autoPromote);
+      else {
+        chess.move(matches.find((m) => m.promotion === autoPromote) ?? matches[0]);
+        refresh();
+      }
       return 'moved';
     }
     // Multiple matches sharing the same from/to only happens for promotions (one per piece choice).
@@ -225,14 +259,23 @@ export default function App() {
 
   const completePromotion = (piece: PromotionPiece) => {
     if (!pendingPromotion) return;
-    chess.move({ from: pendingPromotion.from, to: pendingPromotion.to, promotion: piece });
+    if (mode === 'online') {
+      onlineGame.sendMove(pendingPromotion.from, pendingPromotion.to, piece);
+    } else {
+      chess.move({ from: pendingPromotion.from, to: pendingPromotion.to, promotion: piece });
+      refresh();
+    }
     setPendingPromotion(null);
-    refresh();
   };
 
   const cancelPromotion = () => setPendingPromotion(null);
 
+  // A shared online game can't be unilaterally restarted without desyncing
+  // from the opponent — leaving the room first is required.
+  const canRestart = mode !== 'online' || onlineGame.status === 'idle' || onlineGame.status === 'error';
+
   const handleNewGame = () => {
+    if (!canRestart) return;
     stopSearch();
     chessRef.current = new Chess();
     setSelected(null);
@@ -252,7 +295,7 @@ export default function App() {
     if (!result) return;
     setSaveStatus('saving');
     try {
-      await saveGame({ pgn: chess.pgn(), result, mode, humanSide: mode === 'ai' ? humanSide : null });
+      await saveGame({ pgn: chess.pgn(), result, mode, humanSide: mode === 'human' ? null : humanSide });
       setSaveStatus('saved');
       setHistoryRefreshKey((k) => k + 1);
     } catch {
@@ -269,6 +312,12 @@ export default function App() {
 
   const confirmResign = () => {
     setConfirmingResign(false);
+    if (mode === 'online') {
+      // Both players' local state updates uniformly via the server's
+      // "resigned" broadcast (handleOnlineResigned), not immediately here.
+      onlineGame.sendResign();
+      return;
+    }
     // In Human vs AI, resigning always means the human gives up. In Human vs
     // Human there's no fixed "human side", so it's whoever's turn it is.
     const resigningSide: Side = mode === 'ai' ? humanSide : chess.turn();
@@ -295,7 +344,7 @@ export default function App() {
     }
   }
 
-  const orientation: Side = mode === 'ai' ? humanSide : 'w';
+  const orientation: Side = mode === 'ai' || mode === 'online' ? humanSide : 'w';
   const topSide: Side = orientation === 'w' ? 'b' : 'w';
   const bottomSide: Side = orientation;
   const turnActive = !gameOver && chess.turn();
@@ -350,6 +399,7 @@ export default function App() {
           mode={mode}
           onModeChange={(m) => {
             stopSearch();
+            if (mode === 'online' && m !== 'online') onlineGame.disconnect();
             setMode(m);
             setSelected(null);
             setPremove(null);
@@ -367,9 +417,11 @@ export default function App() {
           timeControlLocked={history.length > 0}
           pieceTheme={pieceTheme}
           onPieceThemeChange={handlePieceThemeChange}
+          onlineGame={onlineGame}
           onNewGame={handleNewGame}
+          canRestart={canRestart}
           onResign={requestResign}
-          canResign={!gameOver}
+          canResign={!gameOver && (mode !== 'online' || onlineGame.status === 'playing')}
           status={statusText(chess, mode, humanSide, aiThinking, externalLoser, terminationReason)}
         />
       </div>

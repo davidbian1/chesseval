@@ -19,9 +19,11 @@
   },
   "dependencies": {
     "@prisma/client": "^6.5.0",
+    "chess.js": "^1.4.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
-    "prisma": "^6.5.0"
+    "prisma": "^6.5.0",
+    "ws": "^8.21.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
@@ -29,6 +31,7 @@
     "@types/express": "^4.17.21",
     "@types/node": "^22.10.5",
     "@types/supertest": "^6.0.2",
+    "@types/ws": "^8.18.1",
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.9.0",

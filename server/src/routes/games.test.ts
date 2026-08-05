@@ -43,6 +43,14 @@ describe('POST /games', () => {
     expect(res.body.humanSide).toBeNull();
   });
 
+  it('accepts "online" as a mode', async () => {
+    const res = await request(app)
+      .post('/games')
+      .send({ ...validGame, mode: 'online' });
+    expect(res.status).toBe(201);
+    expect(res.body.mode).toBe('online');
+  });
+
   it('rejects a missing pgn', async () => {
     const res = await request(app)
       .post('/games')

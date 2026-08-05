@@ -12,9 +12,9 @@ model Game {
   pgn       String
   /// One of "1-0", "0-1", "1/2-1/2"
   result    String
-  /// "human" (Human vs Human) or "ai" (Human vs AI)
+  /// "human" (local Human vs Human), "ai" (Human vs AI), or "online" (remote multiplayer)
   mode      String
-  /// Which side the human played, when mode is "ai". Null for Human vs Human.
+  /// Which side the saving player was, when mode is "ai" or "online". Null for local Human vs Human.
   humanSide String?
   createdAt DateTime @default(now())
 }
