@@ -2,7 +2,7 @@ import { TIME_CONTROLS, type TimeControl } from '../clock';
 import { PIECE_THEMES, type PieceTheme } from '../pieceThemes';
 import { OnlineLobby } from './OnlineLobby';
 import type { OnlineGame } from '../hooks/useOnlineGame';
-import { isBackendConfigured } from '../api/backend';
+import { isOnlinePlayConfigured } from '../api/backend';
 
 export type GameMode = 'human' | 'ai' | 'online';
 export type Side = 'w' | 'b';
@@ -63,7 +63,7 @@ export function Controls({
         <button className={mode === 'ai' ? 'toggle active' : 'toggle'} onClick={() => onModeChange('ai')}>
           Human vs AI
         </button>
-        {isBackendConfigured() && (
+        {isOnlinePlayConfigured() && (
           <button className={mode === 'online' ? 'toggle active' : 'toggle'} onClick={() => onModeChange('online')}>
             Play Online
           </button>

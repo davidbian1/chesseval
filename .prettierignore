@@ -3,3 +3,4 @@ src-tauri
 server/dist
 server/generated
 server/prisma/migrations
+online-server

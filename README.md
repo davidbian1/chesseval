@@ -21,10 +21,11 @@ A minimalist chess game with a live evaluation bar, playable in the browser or a
 - Pieces slide between squares on every move (yours, the AI's, or a premove firing) instead of snapping instantly
 - Classic wood-tone minimal board styling
 - Desktop packaging via [Tauri](https://tauri.app)
-- Optional full-stack features, off by default (the live demo above runs without them — see
-  [Full-stack](#full-stack-game-history--online-play) below):
-  - Game history: save finished games and browse them later
-  - Online play: create a room, share the 6-character code, and play someone on another computer in real time
+- Optional full-stack features, each its own backend service, off by default (the live demo above runs
+  without them — see [Full-stack](#full-stack-game-history--online-play) below):
+  - Game history: save finished games and browse them later (Express + Postgres)
+  - Online play: create a room, share the 6-character code, and play someone on another computer in real
+    time (FastAPI + WebSockets, server-validated with `python-chess`)
 
 ## Running the web app
 
@@ -54,18 +55,21 @@ The installer/executable is written to `src-tauri/target/release/bundle/`.
 
 ## Full-stack: game history & online play
 
-Saved games (PGN, result, mode) and real-time online play are both served by `server/`, a standalone
-Express + Prisma + Postgres API (with a WebSocket server attached to the same HTTP server/port) — the one
-part of this project that isn't purely client-side. Both are entirely optional: the frontend only shows the
-"Save Game" / "Game History" UI and the "Play Online" mode when `VITE_API_URL` is set at build time, so the
-GitHub Pages demo (no backend behind it) is unaffected either way.
+Two independent backend services, deliberately in two different languages — the frontend is otherwise 100%
+client-side, and both of these are optional (off in the GitHub Pages demo above):
 
-Online play is a thin, server-authoritative relay: rooms are in-memory (a 6-character code identifies each
-one), every move is validated with chess.js on the server before being relayed to both players, and a room
-is cleaned up once both sides disconnect. There's no reconnect-to-a-dropped-game support yet, and it isn't
-deployed anywhere publicly — going from "works locally / on a LAN" to "playable with anyone on the internet"
-just needs the backend hosted somewhere with a public URL (e.g. Render or Fly.io, both Docker-friendly with a
-free tier) and the frontend's `VITE_API_URL` pointed at it.
+- **`server/`** — Express + Prisma + Postgres (TypeScript). Saves finished games (PGN, result, mode) for the
+  "Save Game" / "Game History" UI. Enabled at build time by setting `VITE_API_URL`.
+- **`online-server/`** — FastAPI (Python), using [`python-chess`](https://python-chess.readthedocs.io/) for
+  server-side move validation. Powers the "Play Online" mode: a thin, server-authoritative WebSocket relay —
+  rooms are in-memory (a 6-character code identifies each one), every move is re-validated on the server
+  before being relayed to both players, and a room is cleaned up once both sides disconnect. Enabled at
+  build time by setting `VITE_WS_URL`.
+
+Neither is deployed anywhere publicly yet, and there's no reconnect-to-a-dropped-game support for online
+play. Going from "works locally / on a LAN" to "playable with anyone on the internet" just needs each backend
+hosted somewhere with a public URL (e.g. Render or Fly.io, both Docker-friendly with a free tier) and the
+frontend's `VITE_API_URL` / `VITE_WS_URL` pointed at them.
 
 Run the whole stack locally with Docker:
 
@@ -73,18 +77,21 @@ Run the whole stack locally with Docker:
 docker compose up --build
 ```
 
-This starts Postgres and the API (applying Prisma migrations automatically on boot) at `http://localhost:4000`.
-Then point the frontend at it:
+This starts Postgres, the games API (applying Prisma migrations automatically on boot) at
+`http://localhost:4000`, and the online-play relay at `http://localhost:8000`. Then point the frontend at both:
 
 ```sh
-echo "VITE_API_URL=http://localhost:4000" > .env.local
+cat > .env.local <<'EOF'
+VITE_API_URL=http://localhost:4000
+VITE_WS_URL=ws://localhost:8000/ws
+EOF
 npm run dev
 ```
 
 Open two browser tabs (or two computers on the same network pointed at your machine's IP) to try online play:
 create a room in one, join with its code in the other.
 
-To work on the backend directly (without Docker): copy `server/.env.example` to `server/.env` (point
+To work on the games API directly (without Docker): copy `server/.env.example` to `server/.env` (point
 `DATABASE_URL` at any local Postgres), then from `server/`:
 
 ```sh
@@ -95,9 +102,20 @@ npm test              # runs against DATABASE_URL from server/.env.test (see .en
 npm run lint
 ```
 
-`server/` has its own `package.json`, `eslint.config.js`, and CI job (`backend` in `.github/workflows/ci.yml`,
-which runs against a Postgres service container) — it's a separate package from the Vite frontend, not a
-workspace.
+To work on the online-play relay directly: from `online-server/`, with Python 3.11+:
+
+```sh
+python -m venv .venv
+.venv/Scripts/activate       # .venv/bin/activate on macOS/Linux
+pip install -r requirements-dev.txt
+uvicorn app.main:app --reload --port 8000
+pytest
+ruff check . && ruff format --check . && mypy .
+```
+
+`server/` and `online-server/` each have their own dependency manifest, lint/format/typecheck tooling, and CI
+job (`backend` and `online-server` in `.github/workflows/ci.yml`) — both are separate packages from the Vite
+frontend, not a workspace.
 
 ## Development
 
@@ -130,17 +148,21 @@ and publishes it to GitHub Pages.
 - `src/components/ErrorBoundary.tsx` — catches render-time errors so the app fails visibly instead of going blank
 - `src/components/GameHistory.tsx` — saved-games list/delete panel
 - `src/gameResult.ts` — pure PGN-result derivation, unit tested
-- `src/api/backend.ts` / `src/api/gamesClient.ts` — shared "is a backend configured" check + the games API client,
-  no-ops when `VITE_API_URL` is unset
+- `src/api/backend.ts` — per-service "is this backend configured" checks (`VITE_API_URL` for game history,
+  `VITE_WS_URL` for online play), each independently optional
+- `src/api/gamesClient.ts` — the games-history API client, no-ops when `VITE_API_URL` is unset
 - `src/hooks/useOnlineGame.ts` / `src/components/OnlineLobby.tsx` — the online-play WebSocket client and its
-  create/join-room UI
+  create/join-room UI, no-ops when `VITE_WS_URL` is unset
 - `src/App.tsx` — game state and UI wiring
 - `src-tauri/` — Tauri desktop shell (Rust)
-- `server/` — standalone Express + Prisma + Postgres API for saved games and online play (own `package.json`;
-  see [Full-stack](#full-stack-game-history--online-play))
-  - `server/src/rooms.ts` / `server/src/ws.ts` — in-memory room state and the WebSocket relay, unit tested
-    (including a full two-client integration test)
-- `docker-compose.yml` — `api` + `db` services for running the full stack locally
+- `server/` — standalone Express + Prisma + Postgres API for saved games (own `package.json`; TypeScript; see
+  [Full-stack](#full-stack-game-history--online-play))
+- `online-server/` — standalone FastAPI online-play relay (own `requirements.txt`/`pyproject.toml`; Python +
+  [`python-chess`](https://python-chess.readthedocs.io/) for server-side legality; see
+  [Full-stack](#full-stack-game-history--online-play))
+  - `online-server/app/rooms.py` / `online-server/app/main.py` — in-memory room state and the WebSocket
+    relay, unit tested (including a full two-client integration test via FastAPI's `TestClient`)
+- `docker-compose.yml` — `db` + `api` + `online` services for running the full stack locally
 
 ## License
 

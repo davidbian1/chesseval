@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type MutableRefObject } from 'react';
 import type { Chess, Square } from 'chess.js';
-import { isBackendConfigured, wsUrl } from '../api/backend';
+import { isOnlinePlayConfigured, wsUrl } from '../api/backend';
 import type { PromotionPiece } from '../components/PromotionPicker';
 import type { Side } from '../components/Controls';
 
@@ -60,7 +60,7 @@ export function useOnlineGame(
   }, []);
 
   const connect = (afterOpen: (ws: WebSocket) => void) => {
-    if (!isBackendConfigured()) {
+    if (!isOnlinePlayConfigured()) {
       setStatus('error');
       setErrorMessage('Online play is not configured for this deployment.');
       return;

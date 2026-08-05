@@ -26,5 +26,10 @@ services:
       db:
         condition: service_healthy
 
+  online:
+    build: ./online-server
+    ports:
+      - '8000:8000'
+
 volumes:
   chesseval-db-data:

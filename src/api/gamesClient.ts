@@ -1,4 +1,4 @@
-import { apiUrl, isBackendConfigured } from './backend';
+import { apiUrl, isGameHistoryConfigured } from './backend';
 
 export interface SavedGame {
   id: number;
@@ -18,7 +18,7 @@ export interface SaveGameInput {
 
 /** Whether a chesseval-server API is configured — game history is a no-op without one (e.g. static deploys). */
 export function isGameHistoryEnabled(): boolean {
-  return isBackendConfigured();
+  return isGameHistoryConfigured();
 }
 
 export async function saveGame(input: SaveGameInput): Promise<SavedGame> {
