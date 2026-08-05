@@ -160,6 +160,14 @@ body {
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.45));
 }
 
+.piece-image {
+  display: block;
+  width: 48px;
+  height: 48px;
+  pointer-events: none;
+  user-select: none;
+}
+
 .piece.w {
   color: #fbf6ec;
   -webkit-text-stroke: 1px #4a3a26;
@@ -312,7 +320,7 @@ body {
   accent-color: var(--wood-darker);
 }
 
-.time-control-select {
+.select-input {
   font-family: inherit;
   font-size: 13px;
   padding: 8px 10px;
@@ -323,7 +331,7 @@ body {
   cursor: pointer;
 }
 
-.time-control-select:disabled {
+.select-input:disabled {
   opacity: 0.6;
   cursor: default;
 }

@@ -11,6 +11,7 @@ import { useEngineEvaluation } from './hooks/useEngineEvaluation';
 import { useChessClock } from './hooks/useChessClock';
 import { DEFAULT_TIME_CONTROL, flaggedSide, type TimeControl } from './clock';
 import { pseudoLegalPremoveTargets } from './premove';
+import { loadPieceTheme, savePieceTheme, type PieceTheme } from './pieceThemes';
 import { gameResult } from './gameResult';
 import { isGameHistoryEnabled, saveGame } from './api/gamesClient';
 import { GameHistory } from './components/GameHistory';
@@ -62,6 +63,7 @@ export default function App() {
   const [timedOutBy, setTimedOutBy] = useState<Side | null>(null);
   const [confirmingResign, setConfirmingResign] = useState(false);
   const [timeControl, setTimeControl] = useState<TimeControl>(DEFAULT_TIME_CONTROL);
+  const [pieceTheme, setPieceTheme] = useState<PieceTheme>(loadPieceTheme);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [showHistory, setShowHistory] = useState(false);
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0);
@@ -76,6 +78,11 @@ export default function App() {
   const refresh = useCallback(() => {
     setFen(chessRef.current.fen());
   }, []);
+
+  const handlePieceThemeChange = (theme: PieceTheme) => {
+    setPieceTheme(theme);
+    savePieceTheme(theme);
+  };
 
   const { evalScore, mateIn, aiThinking, evalThinking, applyExternalLoss, resetForNewGame } = useEngineEvaluation(
     chessRef,
@@ -319,11 +326,17 @@ export default function App() {
             onDragEnd={() => setSelected(null)}
             canDrag={canAct}
             turnColor={chess.turn()}
+            pieceTheme={pieceTheme}
           />
           <Clock ms={bottomSide === 'w' ? whiteMs : blackMs} active={turnActive === bottomSide} />
         </div>
         {pendingPromotion && (
-          <PromotionPicker color={pendingPromotion.color} onPick={completePromotion} onCancel={cancelPromotion} />
+          <PromotionPicker
+            color={pendingPromotion.color}
+            pieceTheme={pieceTheme}
+            onPick={completePromotion}
+            onCancel={cancelPromotion}
+          />
         )}
         {confirmingResign && (
           <ConfirmDialog
@@ -352,6 +365,8 @@ export default function App() {
           timeControl={timeControl}
           onTimeControlChange={setTimeControl}
           timeControlLocked={history.length > 0}
+          pieceTheme={pieceTheme}
+          onPieceThemeChange={handlePieceThemeChange}
           onNewGame={handleNewGame}
           onResign={requestResign}
           canResign={!gameOver}

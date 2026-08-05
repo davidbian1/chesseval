@@ -1,4 +1,5 @@
 import { TIME_CONTROLS, type TimeControl } from '../clock';
+import { PIECE_THEMES, type PieceTheme } from '../pieceThemes';
 
 export type GameMode = 'human' | 'ai';
 export type Side = 'w' | 'b';
@@ -14,6 +15,8 @@ interface ControlsProps {
   onTimeControlChange: (timeControl: TimeControl) => void;
   /** True once the current game has moves — the clock can't be changed mid-game. */
   timeControlLocked: boolean;
+  pieceTheme: PieceTheme;
+  onPieceThemeChange: (theme: PieceTheme) => void;
   onNewGame: () => void;
   onResign: () => void;
   canResign: boolean;
@@ -37,6 +40,8 @@ export function Controls({
   timeControl,
   onTimeControlChange,
   timeControlLocked,
+  pieceTheme,
+  onPieceThemeChange,
   onNewGame,
   onResign,
   canResign,
@@ -59,7 +64,7 @@ export function Controls({
         </label>
         <select
           id="time-control-select"
-          className="time-control-select"
+          className="select-input"
           value={timeControl.id}
           disabled={timeControlLocked}
           onChange={(e) => {
@@ -70,6 +75,24 @@ export function Controls({
           {TIME_CONTROLS.map((tc) => (
             <option key={tc.id} value={tc.id}>
               {tc.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="control-row">
+        <label className="control-label" htmlFor="piece-theme-select">
+          Piece style
+        </label>
+        <select
+          id="piece-theme-select"
+          className="select-input"
+          value={pieceTheme}
+          onChange={(e) => onPieceThemeChange(e.target.value as PieceTheme)}
+        >
+          {PIECE_THEMES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.label}
             </option>
           ))}
         </select>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { Square } from 'chess.js';
-import { UNICODE_PIECES } from './pieceGlyphs';
+import { PieceGlyph } from './PieceGlyph';
+import type { PieceTheme } from '../pieceThemes';
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 const DRAG_THRESHOLD_PX = 4;
@@ -26,11 +27,12 @@ interface BoardProps {
   /** Whether the side to move may currently drag their own pieces. */
   canDrag: boolean;
   turnColor: 'w' | 'b';
+  pieceTheme: PieceTheme;
 }
 
 interface DragGhost {
   square: Square;
-  glyph: string;
+  type: string;
   color: 'w' | 'b';
   x: number;
   y: number;
@@ -66,6 +68,7 @@ export function Board({
   onDragEnd,
   canDrag,
   turnColor,
+  pieceTheme,
 }: BoardProps) {
   const [ghost, setGhost] = useState<DragGhost | null>(null);
 
@@ -81,7 +84,6 @@ export function Board({
 
     const startX = e.clientX;
     const startY = e.clientY;
-    const glyph = UNICODE_PIECES[`${piece.color}${piece.type}`];
     let dragging = false;
 
     const onMove = (ev: PointerEvent) => {
@@ -90,7 +92,7 @@ export function Board({
         const dy = ev.clientY - startY;
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
         dragging = true;
-        setGhost({ square, glyph, color: piece.color, x: ev.clientX, y: ev.clientY });
+        setGhost({ square, type: piece.type, color: piece.color, x: ev.clientX, y: ev.clientY });
         onPieceDragStart(square);
       }
       setGhost((g) => (g ? { ...g, x: ev.clientX, y: ev.clientY } : g));
@@ -156,7 +158,7 @@ export function Board({
                   className={`piece ${piece.color}${isDraggable ? ' draggable' : ''}${isGhostSource ? ' dragging-source' : ''}`}
                   onPointerDown={(e) => handlePointerDown(e, square, piece)}
                 >
-                  {UNICODE_PIECES[`${piece.color}${piece.type}`]}
+                  <PieceGlyph theme={pieceTheme} color={piece.color} type={piece.type} />
                 </span>
               )}
               {isTarget && <span className={piece ? 'target-dot capture' : 'target-dot'} />}
@@ -166,7 +168,7 @@ export function Board({
       )}
       {ghost && (
         <span className={`piece ${ghost.color} drag-ghost`} style={{ left: ghost.x, top: ghost.y }}>
-          {ghost.glyph}
+          <PieceGlyph theme={pieceTheme} color={ghost.color} type={ghost.type} />
         </span>
       )}
     </div>

@@ -13,6 +13,10 @@ A minimalist chess game with a live evaluation bar, playable in the browser or a
 - Live eval bar showing Stockfish's honest assessment, updated after every move (always at full engine strength, independent of the AI opponent's difficulty)
 - Toggle between **Human vs Human** and **Human vs AI**
 - Adjustable AI strength slider — maps to Stockfish's Skill Level (0–20) and scales think time
+- Time controls with presets from 1+0 up to 30+0 (including 2+1/3+2-style Fischer increment), or no clock at all
+- Premoves against the AI: queue a move during its think time and it plays instantly on your turn
+- Two piece styles — Minimalist (the default Unicode glyphs) and Fantasy (an MIT-licensed SVG set), remembered
+  across visits
 - Classic wood-tone minimal board styling
 - Desktop packaging via [Tauri](https://tauri.app)
 - Optional game history: save finished games and browse them later, backed by a small Express + Postgres API
@@ -101,10 +105,14 @@ and publishes it to GitHub Pages.
 - `src/engine/uci.ts` — pure UCI info-line parsing, unit tested independent of the Worker
 - `public/stockfish-18-lite-single.{js,wasm}` — the bundled engine (from the [`stockfish`](https://www.npmjs.com/package/stockfish) npm package)
 - `src/hooks/useEngineEvaluation.ts` — owns the AI-move search and eval-bar refresh effects
+- `src/clock.ts` / `src/hooks/useChessClock.ts` — time-control ticking, increment, and flag-fall, unit tested
+- `src/premove.ts` — pseudo-legal premove target generation, unit tested
+- `src/pieceThemes.ts` / `src/components/PieceGlyph.tsx` — piece-style theme switching (Unicode glyphs or SVG)
+- `public/pieces/fantasy/` — the "Fantasy" SVG piece set (MIT licensed, see its `LICENSE.txt`)
 - `src/components/Board.tsx` — the chessboard UI
 - `src/components/EvalBar.tsx` — the evaluation bar
 - `src/components/evalBarDisplay.ts` — pure score-to-percent/label math for the eval bar, unit tested
-- `src/components/Controls.tsx` — mode toggle, side selector, strength slider
+- `src/components/Controls.tsx` — mode/time-control/piece-style selectors, side selector, strength slider
 - `src/components/ErrorBoundary.tsx` — catches render-time errors so the app fails visibly instead of going blank
 - `src/components/GameHistory.tsx` — saved-games list/delete panel (see [Full-stack](#full-stack-game-history))
 - `src/gameResult.ts` — pure PGN-result derivation, unit tested
@@ -120,3 +128,5 @@ and publishes it to GitHub Pages.
 This project's own code is [MIT licensed](LICENSE).
 
 The bundled Stockfish engine is GPLv3-licensed. This project uses it as a separate, unmodified WASM binary invoked over the UCI protocol (the same arrangement used by lichess.org and most web chess sites), not statically linked into the app's own code. If you plan to distribute this project further, keep `Copying.txt`/attribution for Stockfish alongside it.
+
+The "Fantasy" piece set (`public/pieces/fantasy/`) is by Maurizio Monge, sourced from [lichess-org/lila](https://github.com/lichess-org/lila/tree/master/public/piece/fantasy), MIT licensed — see `public/pieces/fantasy/LICENSE.txt`.

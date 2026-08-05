@@ -1,4 +1,5 @@
-import { UNICODE_PIECES } from './pieceGlyphs';
+import { PieceGlyph } from './PieceGlyph';
+import type { PieceTheme } from '../pieceThemes';
 
 export type PromotionPiece = 'q' | 'r' | 'b' | 'n';
 
@@ -11,11 +12,12 @@ const CHOICES: { piece: PromotionPiece; label: string }[] = [
 
 interface PromotionPickerProps {
   color: 'w' | 'b';
+  pieceTheme: PieceTheme;
   onPick: (piece: PromotionPiece) => void;
   onCancel: () => void;
 }
 
-export function PromotionPicker({ color, onPick, onCancel }: PromotionPickerProps) {
+export function PromotionPicker({ color, pieceTheme, onPick, onCancel }: PromotionPickerProps) {
   return (
     <div className="promotion-backdrop" onClick={onCancel}>
       <div className="promotion-popup" onClick={(e) => e.stopPropagation()}>
@@ -23,7 +25,9 @@ export function PromotionPicker({ color, onPick, onCancel }: PromotionPickerProp
         <div className="promotion-choices">
           {CHOICES.map(({ piece, label }) => (
             <button key={piece} className="promotion-choice" aria-label={label} onClick={() => onPick(piece)}>
-              <span className={`piece ${color}`}>{UNICODE_PIECES[`${color}${piece}`]}</span>
+              <span className={`piece ${color}`}>
+                <PieceGlyph theme={pieceTheme} color={color} type={piece} />
+              </span>
             </button>
           ))}
         </div>
