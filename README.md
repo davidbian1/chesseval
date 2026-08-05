@@ -14,15 +14,17 @@ A minimalist chess game with a live evaluation bar, playable in the browser or a
 - Toggle between **Human vs Human** and **Human vs AI**
 - Adjustable AI strength slider — maps to Stockfish's Skill Level (0–20) and scales think time
 - Time controls with presets from 1+0 up to 30+0 (including 2+1/3+2-style Fischer increment), or no clock at all
-- Premoves against the AI: queue a move during its think time and it plays instantly on your turn
+- Premoves against the AI or a remote opponent: queue a move while it's not your turn and it plays instantly the
+  moment it is
 - Two piece styles — Minimalist (the default Unicode glyphs) and Fantasy (an MIT-licensed SVG set), remembered
   across visits
 - Pieces slide between squares on every move (yours, the AI's, or a premove firing) instead of snapping instantly
 - Classic wood-tone minimal board styling
 - Desktop packaging via [Tauri](https://tauri.app)
-- Optional game history: save finished games and browse them later, backed by a small Express + Postgres API
-  (see [Full-stack: game history](#full-stack-game-history) below — off by default, the live demo above runs
-  without it)
+- Optional full-stack features, off by default (the live demo above runs without them — see
+  [Full-stack](#full-stack-game-history--online-play) below):
+  - Game history: save finished games and browse them later
+  - Online play: create a room, share the 6-character code, and play someone on another computer in real time
 
 ## Running the web app
 
@@ -50,12 +52,20 @@ npm run tauri build
 
 The installer/executable is written to `src-tauri/target/release/bundle/`.
 
-## Full-stack: game history
+## Full-stack: game history & online play
 
-Saved games (PGN, result, mode) are stored via `server/`, a standalone Express + Prisma + Postgres API — the
-one part of this project that isn't purely client-side. It's entirely optional: the frontend only shows the
-"Save Game" / "Game History" UI when `VITE_API_URL` is set at build time, so the GitHub Pages demo (no
-backend behind it) is unaffected either way.
+Saved games (PGN, result, mode) and real-time online play are both served by `server/`, a standalone
+Express + Prisma + Postgres API (with a WebSocket server attached to the same HTTP server/port) — the one
+part of this project that isn't purely client-side. Both are entirely optional: the frontend only shows the
+"Save Game" / "Game History" UI and the "Play Online" mode when `VITE_API_URL` is set at build time, so the
+GitHub Pages demo (no backend behind it) is unaffected either way.
+
+Online play is a thin, server-authoritative relay: rooms are in-memory (a 6-character code identifies each
+one), every move is validated with chess.js on the server before being relayed to both players, and a room
+is cleaned up once both sides disconnect. There's no reconnect-to-a-dropped-game support yet, and it isn't
+deployed anywhere publicly — going from "works locally / on a LAN" to "playable with anyone on the internet"
+just needs the backend hosted somewhere with a public URL (e.g. Render or Fly.io, both Docker-friendly with a
+free tier) and the frontend's `VITE_API_URL` pointed at it.
 
 Run the whole stack locally with Docker:
 
@@ -70,6 +80,9 @@ Then point the frontend at it:
 echo "VITE_API_URL=http://localhost:4000" > .env.local
 npm run dev
 ```
+
+Open two browser tabs (or two computers on the same network pointed at your machine's IP) to try online play:
+create a room in one, join with its code in the other.
 
 To work on the backend directly (without Docker): copy `server/.env.example` to `server/.env` (point
 `DATABASE_URL` at any local Postgres), then from `server/`:
@@ -115,13 +128,18 @@ and publishes it to GitHub Pages.
 - `src/components/evalBarDisplay.ts` — pure score-to-percent/label math for the eval bar, unit tested
 - `src/components/Controls.tsx` — mode/time-control/piece-style selectors, side selector, strength slider
 - `src/components/ErrorBoundary.tsx` — catches render-time errors so the app fails visibly instead of going blank
-- `src/components/GameHistory.tsx` — saved-games list/delete panel (see [Full-stack](#full-stack-game-history))
+- `src/components/GameHistory.tsx` — saved-games list/delete panel
 - `src/gameResult.ts` — pure PGN-result derivation, unit tested
-- `src/api/gamesClient.ts` — fetch client for the games API, no-ops when `VITE_API_URL` is unset
+- `src/api/backend.ts` / `src/api/gamesClient.ts` — shared "is a backend configured" check + the games API client,
+  no-ops when `VITE_API_URL` is unset
+- `src/hooks/useOnlineGame.ts` / `src/components/OnlineLobby.tsx` — the online-play WebSocket client and its
+  create/join-room UI
 - `src/App.tsx` — game state and UI wiring
 - `src-tauri/` — Tauri desktop shell (Rust)
-- `server/` — standalone Express + Prisma + Postgres API for saved games (own `package.json`; see
-  [Full-stack](#full-stack-game-history))
+- `server/` — standalone Express + Prisma + Postgres API for saved games and online play (own `package.json`;
+  see [Full-stack](#full-stack-game-history--online-play))
+  - `server/src/rooms.ts` / `server/src/ws.ts` — in-memory room state and the WebSocket relay, unit tested
+    (including a full two-client integration test)
 - `docker-compose.yml` — `api` + `db` services for running the full stack locally
 
 ## License
