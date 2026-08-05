@@ -17,6 +17,7 @@ A minimalist chess game with a live evaluation bar, playable in the browser or a
 - Premoves against the AI: queue a move during its think time and it plays instantly on your turn
 - Two piece styles — Minimalist (the default Unicode glyphs) and Fantasy (an MIT-licensed SVG set), remembered
   across visits
+- Pieces slide between squares on every move (yours, the AI's, or a premove firing) instead of snapping instantly
 - Classic wood-tone minimal board styling
 - Desktop packaging via [Tauri](https://tauri.app)
 - Optional game history: save finished games and browse them later, backed by a small Express + Postgres API

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Square } from 'chess.js';
 import { PieceGlyph } from './PieceGlyph';
 import type { PieceTheme } from '../pieceThemes';
@@ -71,9 +71,43 @@ export function Board({
   pieceTheme,
 }: BoardProps) {
   const [ghost, setGhost] = useState<DragGhost | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const rankIndices = orientation === 'w' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
   const fileIndices = orientation === 'w' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0];
+
+  // Slide the piece that just landed on lastMove.to in from lastMove.from's
+  // position, using the FLIP technique: both squares are fixed grid cells,
+  // so their current bounding rects alone (no "before" measurement needed)
+  // give the offset to animate away from.
+  useEffect(() => {
+    if (!lastMove) return;
+    const root = boardRef.current;
+    if (!root) return;
+    const pieceEl = root.querySelector<HTMLElement>(`[data-square="${lastMove.to}"] .piece`);
+    const fromEl = root.querySelector<HTMLElement>(`[data-square="${lastMove.from}"]`);
+    const toEl = root.querySelector<HTMLElement>(`[data-square="${lastMove.to}"]`);
+    if (!pieceEl || !fromEl || !toEl) return;
+
+    const fromRect = fromEl.getBoundingClientRect();
+    const toRect = toEl.getBoundingClientRect();
+    const dx = fromRect.left - toRect.left;
+    const dy = fromRect.top - toRect.top;
+    if (dx === 0 && dy === 0) return;
+
+    pieceEl.style.transition = 'none';
+    pieceEl.style.transform = `translate(${dx}px, ${dy}px)`;
+    pieceEl.getBoundingClientRect(); // flush layout so the starting transform is registered
+    const raf = requestAnimationFrame(() => {
+      pieceEl.style.transition = '';
+      pieceEl.style.transform = '';
+    });
+    // Cancels a still-pending flip if another move lands (or the component
+    // unmounts) before this one's animation-start frame fires, so a stale
+    // callback can't clear styles on the wrong piece.
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastMove?.from, lastMove?.to]);
 
   function handlePointerDown(
     e: React.PointerEvent<HTMLSpanElement>,
@@ -122,7 +156,7 @@ export function Board({
   }
 
   return (
-    <div className="board">
+    <div className="board" ref={boardRef}>
       {rankIndices.map((rank) =>
         fileIndices.map((file) => {
           const square = toSquare(rank, file);
